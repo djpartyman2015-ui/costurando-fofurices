@@ -493,6 +493,9 @@ Maleta G | Combos</textarea>
         </div>
         <div class="form-row">
           <div><label>Status de pagamento</label><select id="v_statusPagamento"><option>Pendente</option><option>Pago</option><option>Parcial</option></select></div>
+          <div><label>Tipo de frete</label>
+            <select id="v_tipoFrete"><option>Correios</option><option>Jadlog</option><option>Retirada local</option><option>Motoboy</option><option>Outro</option></select>
+          </div>
           <div><label>Custo de frete (R$)</label><input id="v_frete" type="number" step="0.01" value="0"></div>
           <div><label>Frete pago pelo cliente?</label><select id="v_freteCliente"><option value="sim">Sim, cliente paga</option><option value="nao">Não, eu absorvo</option></select></div>
         </div>
@@ -1004,6 +1007,7 @@ function initUI(db){
       data: document.getElementById("v_data").value,
       prazo: document.getElementById("v_prazo").value,
       frete: parseFloat(document.getElementById("v_frete").value)||0,
+      tipoFrete: document.getElementById("v_tipoFrete").value,
       freteCliente: document.getElementById("v_freteCliente").value,
       status: document.getElementById("v_status").value,
       statusPagamento: document.getElementById("v_statusPagamento").value
@@ -1026,6 +1030,7 @@ function initUI(db){
     document.getElementById("v_status").value = "Pendente";
     document.getElementById("v_statusPagamento").value = "Pendente";
     document.getElementById("v_freteCliente").value = "sim";
+    document.getElementById("v_tipoFrete").value = "Correios";
   }
 
   window.editarVenda = (id)=>{
@@ -1041,6 +1046,7 @@ function initUI(db){
     document.getElementById("v_data").value = v.data||"";
     document.getElementById("v_prazo").value = v.prazo||"";
     document.getElementById("v_frete").value = v.frete||0;
+    document.getElementById("v_tipoFrete").value = v.tipoFrete||"Correios";
     document.getElementById("v_freteCliente").value = v.freteCliente||"sim";
     document.getElementById("v_status").value = v.status||"Pendente";
     document.getElementById("v_statusPagamento").value = v.statusPagamento||"Pendente";
@@ -1090,7 +1096,7 @@ function initUI(db){
         <tr><td style="color:var(--text-soft);padding:6px 0;">Canal</td><td style="text-align:right;"><span class="badge gray">${v.canal||"—"}</span></td></tr>
         <tr><td style="color:var(--text-soft);padding:6px 0;">Data da venda</td><td style="text-align:right;">${fmtData(v.data)}</td></tr>
         <tr><td style="color:var(--text-soft);padding:6px 0;">Data combinada de entrega</td><td style="text-align:right;">${fmtData(v.prazo)}</td></tr>
-        <tr><td style="color:var(--text-soft);padding:6px 0;">Frete</td><td style="text-align:right;">${brl(v.frete)} ${v.freteCliente==="sim"?"(cliente paga)":"(você absorve)"}</td></tr>
+        <tr><td style="color:var(--text-soft);padding:6px 0;">Frete</td><td style="text-align:right;">${brl(v.frete)} · <span class="badge gray">${v.tipoFrete||"—"}</span> ${v.freteCliente==="sim"?"(cliente paga)":"(você absorve)"}</td></tr>
       </table>
       <div style="display:flex;gap:8px;margin-top:16px;">
         <button class="btn small" onclick="editarVenda('${v.id}')">✏️ Editar</button>
