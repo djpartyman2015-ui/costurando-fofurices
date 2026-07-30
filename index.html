@@ -255,8 +255,8 @@ tr:last-child td{border-bottom:none;}
         <tbody id="rankingBody"><tr><td colspan="4" class="empty">Sem dados suficientes ainda</td></tr></tbody></table>
       </div>
 
-      <div class="section-title"><h2>🛒 Lista de compras (suprimentos acabando)</h2></div>
-      <div class="card" id="estoqueAlertCard"><div class="empty">Nenhum suprimento abaixo do mínimo 🎉</div></div>
+      <div class="section-title"><h2>🧾 Últimas compras de suprimentos</h2></div>
+      <div class="card" id="estoqueAlertCard"><div class="empty">Nenhuma compra registrada ainda</div></div>
 
       <div class="section-title"><h2>💡 Dicas para aumentar sua margem</h2></div>
       <div class="tip-box">
@@ -400,26 +400,25 @@ Maleta G | Combos</textarea>
 
     <!-- ============ SUPRIMENTOS ============ -->
     <section class="view" id="view-suprimentos">
-      <div class="topbar"><h1>Controle de Suprimentos</h1><button class="btn" onclick="novoMaterial()">+ Novo item</button></div>
+      <div class="topbar"><h1>Controle de Suprimentos</h1><button class="btn" onclick="novaCompra()">+ Nova compra</button></div>
 
       <div class="form-panel" id="form-material">
         <div class="form-row">
-          <div><label>Nome</label><input id="m_nome" placeholder="Ex: Tecido tricoline"></div>
-          <div><label>Unidade</label><input id="m_unidade" placeholder="Ex: metro, unidade, kg"></div>
-          <div><label>Estoque atual</label><input id="m_estoque" type="number" step="0.01"></div>
+          <div><label>Nome da loja</label><input id="m_loja" placeholder="Ex: Armarinhos Fernando"></div>
+          <div><label>Data da compra</label><input id="m_dataCompra" type="date"></div>
+          <div><label>Cartão usado</label><input id="m_cartao" placeholder="Ex: Nubank, Inter..."></div>
         </div>
         <div class="form-row">
-          <div><label>Estoque mínimo</label><input id="m_min" type="number" step="0.01"></div>
-          <div><label>Custo unitário (R$)</label><input id="m_custo" type="number" step="0.01"></div>
-          <div><label>Data da compra</label><input id="m_dataCompra" type="date"></div>
+          <div><label>Valor gasto (R$)</label><input id="m_valor" type="number" step="0.01"></div>
+          <div><label>Valor do frete (R$)</label><input id="m_frete" type="number" step="0.01" value="0"></div>
         </div>
-        <button class="btn" id="btnSalvarMaterial" onclick="salvarMaterial()">Salvar item</button>
+        <button class="btn" id="btnSalvarMaterial" onclick="salvarMaterial()">Salvar compra</button>
         <button class="btn secondary" onclick="limparFormMaterial(); toggleForm('material')">Cancelar</button>
       </div>
 
       <div class="card" style="padding:0;">
-        <table><thead><tr><th>Item</th><th>Estoque</th><th>Mínimo</th><th>Custo unit.</th><th>Comprado em</th><th>Status</th><th></th></tr></thead>
-        <tbody id="suprimentosBody"><tr><td colspan="7" class="empty">Nenhum item cadastrado</td></tr></tbody></table>
+        <table><thead><tr><th>Loja</th><th>Data</th><th>Valor</th><th>Frete</th><th>Total</th><th>Cartão</th><th></th></tr></thead>
+        <tbody id="suprimentosBody"><tr><td colspan="7" class="empty">Nenhuma compra registrada</td></tr></tbody></table>
       </div>
     </section>
 
@@ -824,7 +823,8 @@ function initUI(db){
   function renderCatalogo(){
     const grid = document.getElementById("catalogoGrid");
     if(!state.produtos.length){ grid.innerHTML = '<div class="empty" style="grid-column:1/-1;">Nenhum produto cadastrado ainda.</div>'; return; }
-    grid.innerHTML = state.produtos.map(p=>{
+    const ordenados = [...state.produtos].sort((a,b)=> a.nome.localeCompare(b.nome, "pt-BR"));
+    grid.innerHTML = ordenados.map(p=>{
       const custo = (p.custoMaterial||0)+(p.custoMaoObra||0);
       const {margem, cls} = margemInfo(p.preco, custo);
       return `<div class="card">
@@ -843,7 +843,8 @@ function initUI(db){
     }).join("");
   }
   function renderVendaProdutoOptions(){
-    document.getElementById("v_produto").innerHTML = state.produtos.map(p=>`<option value="${p.id}">${p.nome} — ${brl(p.preco)}</option>`).join("");
+    const ordenados = [...state.produtos].sort((a,b)=> a.nome.localeCompare(b.nome, "pt-BR"));
+    document.getElementById("v_produto").innerHTML = ordenados.map(p=>`<option value="${p.id}">${p.nome} — ${brl(p.preco)}</option>`).join("");
   }
 
   /* ---------- SUPRIMENTOS ---------- */
@@ -851,14 +852,13 @@ function initUI(db){
 
   window.salvarMaterial = async ()=>{
     const data = {
-      nome: document.getElementById("m_nome").value.trim(),
-      unidade: document.getElementById("m_unidade").value.trim(),
-      estoque: parseFloat(document.getElementById("m_estoque").value)||0,
-      minimo: parseFloat(document.getElementById("m_min").value)||0,
-      custo: parseFloat(document.getElementById("m_custo").value)||0,
-      dataCompra: document.getElementById("m_dataCompra").value || ""
+      loja: document.getElementById("m_loja").value.trim(),
+      dataCompra: document.getElementById("m_dataCompra").value || "",
+      cartao: document.getElementById("m_cartao").value.trim(),
+      valor: parseFloat(document.getElementById("m_valor").value)||0,
+      frete: parseFloat(document.getElementById("m_frete").value)||0
     };
-    if(!data.nome){ alert("Informe o nome do item."); return; }
+    if(!data.loja){ alert("Informe o nome da loja."); return; }
     if(materialEditandoId){
       await updateDoc(doc(db,"materiais",materialEditandoId), data);
     } else {
@@ -870,11 +870,14 @@ function initUI(db){
 
   function limparFormMaterial(){
     materialEditandoId = null;
-    document.getElementById("btnSalvarMaterial").textContent = "Salvar item";
-    ["m_nome","m_unidade","m_estoque","m_min","m_custo","m_dataCompra"].forEach(id=>document.getElementById(id).value="");
+    document.getElementById("btnSalvarMaterial").textContent = "Salvar compra";
+    ["m_loja","m_cartao","m_valor"].forEach(id=>document.getElementById(id).value="");
+    document.getElementById("m_dataCompra").value = "";
+    document.getElementById("m_frete").value = 0;
   }
-  window.novoMaterial = ()=>{
+  window.novaCompra = ()=>{
     limparFormMaterial();
+    document.getElementById("m_dataCompra").value = new Date().toISOString().slice(0,10);
     document.getElementById("form-material").classList.add("open");
     document.getElementById("form-material").scrollIntoView({behavior:"smooth", block:"start"});
   };
@@ -882,51 +885,35 @@ function initUI(db){
     const m = state.materiais.find(x=>x.id===id);
     if(!m) return;
     materialEditandoId = id;
-    document.getElementById("m_nome").value = m.nome||"";
-    document.getElementById("m_unidade").value = m.unidade||"";
-    document.getElementById("m_estoque").value = m.estoque||0;
-    document.getElementById("m_min").value = m.minimo||0;
-    document.getElementById("m_custo").value = m.custo||0;
+    document.getElementById("m_loja").value = m.loja||"";
     document.getElementById("m_dataCompra").value = m.dataCompra||"";
+    document.getElementById("m_cartao").value = m.cartao||"";
+    document.getElementById("m_valor").value = m.valor||0;
+    document.getElementById("m_frete").value = m.frete||0;
     document.getElementById("btnSalvarMaterial").textContent = "Salvar alterações";
     document.getElementById("form-material").classList.add("open");
     document.getElementById("form-material").scrollIntoView({behavior:"smooth", block:"start"});
   };
-  window.excluirMaterial = async (id)=>{ if(confirm("Excluir este item?")) await deleteDoc(doc(db,"materiais",id)); };
+  window.excluirMaterial = async (id)=>{ if(confirm("Excluir esta compra?")) await deleteDoc(doc(db,"materiais",id)); };
 
   function renderSuprimentos(){
     const body = document.getElementById("suprimentosBody");
-    if(!state.materiais.length){ body.innerHTML = '<tr><td colspan="7" class="empty">Nenhum item cadastrado</td></tr>'; return; }
-    body.innerHTML = state.materiais.map(m=>{
-      const baixo = m.estoque <= m.minimo;
-      return `<tr>
-        <td>${m.nome}</td><td>${m.estoque} ${m.unidade||""}</td><td>${m.minimo} ${m.unidade||""}</td><td>${brl(m.custo)}</td>
-        <td>${fmtData(m.dataCompra)}</td>
-        <td><span class="badge ${baixo?"red":"green"}">${baixo?"Estoque baixo":"OK"}</span></td>
+    const ordenadas = [...state.materiais].sort((a,b)=> (b.dataCompra||"").localeCompare(a.dataCompra||""));
+    if(!ordenadas.length){ body.innerHTML = '<tr><td colspan="7" class="empty">Nenhuma compra registrada</td></tr>'; return; }
+    body.innerHTML = ordenadas.map(m=>`<tr>
+        <td>${m.loja}</td><td>${fmtData(m.dataCompra)}</td><td>${brl(m.valor)}</td><td>${brl(m.frete)}</td>
+        <td><b>${brl((m.valor||0)+(m.frete||0))}</b></td><td>${m.cartao||"—"}</td>
         <td><button class="btn ghost small" onclick="editarMaterial('${m.id}')">Editar</button> <button class="btn ghost small" onclick="excluirMaterial('${m.id}')">Excluir</button></td>
-      </tr>`;
-    }).join("");
+      </tr>`).join("");
 
-    // Lista de compras (dashboard) — itens no mínimo, com quanto falta e custo estimado
-    const baixos = state.materiais.filter(m=>m.estoque<=m.minimo);
+    // Últimas compras (dashboard)
+    const recentes = [...state.materiais].sort((a,b)=> (b.dataCompra||"").localeCompare(a.dataCompra||"")).slice(0,5);
     const alertCard = document.getElementById("estoqueAlertCard");
-    if(!baixos.length){
-      alertCard.innerHTML = '<div class="empty">Nenhum suprimento abaixo do mínimo 🎉</div>';
-    } else {
-      const custoTotalCompra = baixos.reduce((s,m)=> s + Math.max(m.minimo - m.estoque, m.minimo*0.5) * (m.custo||0), 0);
-      alertCard.innerHTML = `<table><thead><tr><th>Item</th><th>Estoque atual</th><th>Sugestão de compra</th><th>Custo estimado</th></tr></thead><tbody>` +
-        baixos.map(m=>{
-          const faltam = Math.max(m.minimo - m.estoque, m.minimo*0.5 || 1);
-          const custoEst = faltam * (m.custo||0);
-          return `<tr>
-            <td>🧵 <b>${m.nome}</b></td>
-            <td>${m.estoque} ${m.unidade||""}</td>
-            <td>~${faltam.toFixed(1)} ${m.unidade||""}</td>
-            <td>${brl(custoEst)}</td>
-          </tr>`;
-        }).join("") +
-        `</tbody></table><div style="text-align:right;padding:10px 4px 2px;font-weight:700;font-size:13px;">Total estimado da compra: ${brl(custoTotalCompra)}</div>`;
-    }
+    alertCard.innerHTML = recentes.length
+      ? `<table><thead><tr><th>Loja</th><th>Data</th><th>Total</th><th>Cartão</th></tr></thead><tbody>` +
+        recentes.map(m=>`<tr><td>🧵 <b>${m.loja}</b></td><td>${fmtData(m.dataCompra)}</td><td>${brl((m.valor||0)+(m.frete||0))}</td><td>${m.cartao||"—"}</td></tr>`).join("") +
+        `</tbody></table>`
+      : '<div class="empty">Nenhuma compra registrada ainda</div>';
   }
 
   /* ---------- CUSTOS ---------- */
@@ -1300,14 +1287,16 @@ function initUI(db){
   function dadosDoMes(mk){
     const vendasMes = state.vendas.filter(v=>monthKey(v.data)===mk);
     const custosMes = state.custos.filter(c=>c.recorrente==="sim" || monthKey(c.data)===mk);
+    const comprasMes = state.materiais.filter(m=>monthKey(m.dataCompra)===mk);
     const receita = vendasMes.reduce((s,v)=>s+totalVenda(v),0);
     const custoProdutos = vendasMes.reduce((s,v)=>s+custoProdutosVenda(v),0);
     const custoFreteAbsorvido = vendasMes.reduce((s,v)=> s + (v.freteCliente==="nao" ? v.frete : 0), 0);
     const custosGerais = custosMes.reduce((s,c)=>s+c.valor,0);
-    const custoTotal = custoProdutos + custoFreteAbsorvido + custosGerais;
+    const custoSuprimentos = comprasMes.reduce((s,m)=>s+(m.valor||0)+(m.frete||0),0);
+    const custoTotal = custoProdutos + custoFreteAbsorvido + custosGerais + custoSuprimentos;
     const lucro = receita - custoTotal;
     const margem = receita>0 ? (lucro/receita*100) : 0;
-    return { vendasMes, custosMes, receita, custoProdutos, custoFreteAbsorvido, custosGerais, custoTotal, lucro, margem };
+    return { vendasMes, custosMes, comprasMes, receita, custoProdutos, custoFreteAbsorvido, custosGerais, custoSuprimentos, custoTotal, lucro, margem };
   }
 
   function renderDashboard(){
@@ -1403,8 +1392,7 @@ function initUI(db){
         insights.push(`<b>Comparado ao mês anterior:</b> receita ${cresceu?"cresceu":"caiu"} ${Math.abs(((receita-anterior.receita)/anterior.receita)*100).toFixed(0)}%, e a margem foi de ${anterior.margem.toFixed(0)}% para ${margem.toFixed(0)}%.`);
       }
     }
-    const materiaisBaixos = state.materiais.filter(m=>m.estoque<=m.minimo).length;
-    if(materiaisBaixos) insights.push(`<b>Estoque:</b> ${materiaisBaixos} item(ns) de suprimento abaixo do mínimo — veja a aba Suprimentos.`);
+    if(atual.custoSuprimentos>0) insights.push(`<b>Suprimentos:</b> você gastou ${brl(atual.custoSuprimentos)} em compras de material este mês — já contabilizado no custo total acima.`);
 
     const pendentesPagamento = vendasMes.filter(v=> v.statusPagamento!=="Pago");
     if(pendentesPagamento.length){
@@ -1424,7 +1412,8 @@ function initUI(db){
     const custoPorMes = meses.map(m=>{
       const vs = state.vendas.filter(v=>monthKey(v.data)===m.key);
       const cs = state.custos.filter(c=> c.recorrente==="sim" || monthKey(c.data)===m.key);
-      return vs.reduce((s,v)=>s+custoProdutosVenda(v) + (v.freteCliente==="nao"?v.frete:0),0) + cs.reduce((s,c)=>s+c.valor,0);
+      const ms = state.materiais.filter(mm=>monthKey(mm.dataCompra)===m.key);
+      return vs.reduce((s,v)=>s+custoProdutosVenda(v) + (v.freteCliente==="nao"?v.frete:0),0) + cs.reduce((s,c)=>s+c.valor,0) + ms.reduce((s,mm)=>s+(mm.valor||0)+(mm.frete||0),0);
     });
     const lucroPorMes = meses.map((m,i)=> receitaPorMes[i]-custoPorMes[i]);
 
