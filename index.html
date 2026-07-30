@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ateliê Costurando Fofurices — Gestão</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#FFF8F4;
+  --surface:#FFFFFF;
+  --primary:#E3A6AC;
+  --primary-dark:#CB8288;
+  --secondary:#A8C4A2;
+  --mint:#8FC9A9;
+  --coral:#E8918A;
+  --amber:#E8C070;
+  --text:#4A3B3F;
+  --text-soft:#9C8B8F;
+  --border:#F0E2E6;
+  --radius:16px;
+  --logo-url: none;
+}
+*{box-sizing:border-box;}
+body{margin:0;font-family:'Nunito Sans',sans-serif;background:var(--bg);color:var(--text);}
+h1,h2,h3,.brand-font{font-family:'Fredoka',sans-serif;}
+button{font-family:inherit;cursor:pointer;}
+input,select,textarea{font-family:inherit;}
+
+/* ---------- SETUP SCREEN ---------- */
+#setupScreen{position:fixed;inset:0;background:linear-gradient(135deg,#FFF8F4,#F3E8F5);display:flex;align-items:center;justify-content:center;z-index:999;padding:24px;}
+.setup-card{background:var(--surface);border-radius:20px;padding:36px 32px;max-width:560px;box-shadow:0 20px 60px rgba(214,123,149,.18);}
+.setup-card h1{margin:0 0 8px;font-size:26px;color:var(--primary-dark);}
+.setup-card p{line-height:1.6;color:var(--text-soft);font-size:14.5px;}
+.setup-card code{background:#FBEFF2;padding:2px 6px;border-radius:6px;font-size:13px;}
+.setup-card ol{padding-left:20px;line-height:1.9;font-size:14.5px;}
+
+/* ---------- SHELL ---------- */
+.shell{display:none;min-height:100vh;}
+.shell.ready{display:flex;}
+.sidebar{width:230px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:22px 16px;position:sticky;top:0;height:100vh;flex-shrink:0;}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:26px;padding:0 4px;}
+.brand img{width:38px;height:38px;border-radius:50%;object-fit:cover;background:var(--primary);}
+.brand-mark{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.brand-name{font-size:16px;font-weight:600;color:var(--primary-dark);line-height:1.1;}
+.brand-sub{font-size:10.5px;color:var(--text-soft);letter-spacing:.04em;text-transform:uppercase;}
+
+.nav{display:flex;flex-direction:column;gap:3px;flex:1;}
+.nav button{display:flex;align-items:center;gap:11px;background:none;border:none;padding:11px 12px;border-radius:12px;text-align:left;font-size:14px;font-weight:600;color:var(--text-soft);transition:.15s;}
+.nav button .ic{font-size:17px;width:20px;text-align:center;}
+.nav button:hover{background:#FBEFF2;color:var(--primary-dark);}
+.nav button.active{background:linear-gradient(135deg,var(--primary),var(--secondary));color:#fff;}
+
+.spool{margin-top:14px;padding-top:16px;border-top:1px solid var(--border);text-align:center;}
+.spool-label{font-size:10.5px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+.spool-ring{position:relative;width:88px;height:88px;margin:0 auto;}
+.spool-ring svg{transform:rotate(-90deg);}
+.spool-ring .pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Fredoka';font-size:17px;font-weight:600;color:var(--text);}
+.spool-note{font-size:10px;color:var(--text-soft);margin-top:6px;line-height:1.4;}
+
+main{flex:1;padding:26px 32px 60px;max-width:1180px;}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;}
+.topbar h1{margin:0;font-size:22px;color:var(--text);}
+.topbar .date{font-size:13px;color:var(--text-soft);}
+.view{display:none;}
+.view.active{display:block;animation:fade .25s ease;}
+@keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+.grid{display:grid;gap:16px;}
+.grid.cols-4{grid-template-columns:repeat(4,1fr);}
+.grid.cols-3{grid-template-columns:repeat(3,1fr);}
+.grid.cols-2{grid-template-columns:repeat(2,1fr);}
+@media(max-width:1000px){.grid.cols-4,.grid.cols-3,.grid.cols-2{grid-template-columns:repeat(2,1fr);}}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;}
+.kpi .label{font-size:12px;color:var(--text-soft);font-weight:700;text-transform:uppercase;letter-spacing:.03em;}
+.kpi .value{font-family:'Fredoka';font-size:25px;margin-top:6px;}
+.kpi .sub{font-size:12px;margin-top:4px;font-weight:700;}
+.up{color:var(--mint);}
+.down{color:var(--coral);}
+
+.section-title{display:flex;justify-content:space-between;align-items:center;margin:28px 0 12px;}
+.section-title h2{font-size:17px;margin:0;}
+.btn{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;border:none;padding:9px 16px;border-radius:10px;font-weight:700;font-size:13px;}
+.btn.secondary{background:var(--surface);border:1.5px solid var(--border);color:var(--text);}
+.btn.ghost{background:none;border:none;color:var(--primary-dark);font-weight:700;padding:6px 8px;}
+.btn.small{padding:6px 11px;font-size:12px;}
+.btn.danger{background:#FCEDEC;color:#C25B54;}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px;}
+th{text-align:left;color:var(--text-soft);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;padding:8px 10px;border-bottom:1px solid var(--border);}
+td{padding:10px;border-bottom:1px solid #F7EEF1;vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+.badge{padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:700;display:inline-block;}
+.badge.green{background:#E8F5EC;color:#3F9463;}
+.badge.amber{background:#FBF2E0;color:#B4801F;}
+.badge.red{background:#FCEAE9;color:#C25B54;}
+.badge.gray{background:#F1EEEF;color:#7A6C70;}
+.thumb{width:38px;height:38px;border-radius:9px;object-fit:cover;background:#F3E8EB;}
+
+.form-panel{background:#FCF6F3;border:1px dashed var(--primary);border-radius:14px;padding:18px;margin-bottom:16px;display:none;}
+.form-panel.open{display:block;}
+.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:10px;}
+.form-row label{display:block;font-size:11.5px;font-weight:700;color:var(--text-soft);margin-bottom:4px;text-transform:uppercase;letter-spacing:.02em;}
+.form-row input, .form-row select, .form-row textarea{width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:9px;font-size:13.5px;background:#fff;}
+.empty{padding:26px;text-align:center;color:var(--text-soft);font-size:13.5px;}
+.tip-box{background:linear-gradient(135deg,#FBEFF2,#F1EAF7);border-radius:14px;padding:16px 18px;font-size:13px;line-height:1.7;}
+.tip-box b{color:var(--primary-dark);}
+.two-col{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;}
+@media(max-width:1000px){.two-col{grid-template-columns:1fr;}}
+.chart-wrap{position:relative;height:260px;}
+.chart-wrap.small{height:210px;}
+.color-swatch{width:34px;height:34px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1.5px var(--border);cursor:pointer;}
+.swatch-row{display:flex;gap:10px;margin-top:6px;}
+.logo-preview{width:64px;height:64px;border-radius:50%;object-fit:cover;background:var(--primary);}
+.entrega-check{width:16px;height:16px;}
+@media print{
+  body *{visibility:hidden;}
+  #printArea, #printArea *{visibility:visible;}
+  #printArea{position:absolute;top:0;left:0;width:100%;padding:10px 0;}
+  .no-print{display:none !important;}
+}
+</style>
+</head>
+<body>
+
+<!-- ================= SETUP SCREEN ================= -->
+<div id="setupScreen">
+  <div class="setup-card">
+    <h1>🧵 Ateliê Costurando Fofurices</h1>
+    <p>Antes de começar, conecte o sistema ao seu projeto Firebase (é grátis e leva 3 minutos).</p>
+    <ol>
+      <li>Abra <code>index.html</code> em um editor de texto.</li>
+      <li>Procure o bloco <code>firebaseConfig</code> no final do arquivo.</li>
+      <li>Substitua os valores pelas credenciais do seu projeto (Console Firebase → ⚙️ Configurações do projeto → Seus apps → SDK).</li>
+      <li>No Firestore, ative o banco em <b>modo produção</b> e cole as regras do comentário <code>REGRAS_FIRESTORE</code> logo acima do <code>firebaseConfig</code>.</li>
+      <li>No Console Firebase, vá em <b>Authentication → Sign-in method</b> e ative o provedor <b>Google</b>.</li>
+      <li>Salve o arquivo e recarregue a página. Você verá uma tela para entrar com sua conta Google.</li>
+    </ol>
+    <p id="setupError" style="color:#C25B54;font-weight:700;"></p>
+  </div>
+</div>
+
+<!-- ================= LOGIN SCREEN ================= -->
+<div id="loginScreen" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#FFF8F4,#F3E8F5);align-items:center;justify-content:center;z-index:998;padding:24px;">
+  <div class="setup-card" style="text-align:center;">
+    <div style="font-size:40px;margin-bottom:6px;">🧵</div>
+    <h1>Ateliê Costurando Fofurices</h1>
+    <p>Entre com sua conta Google para acessar o sistema de gestão.</p>
+    <button id="btnGoogleLogin" class="btn" style="display:inline-flex;align-items:center;gap:10px;padding:12px 22px;font-size:14px;margin-top:8px;">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#fff" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 01-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#fff" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.95v2.33A9 9 0 009 18z"/><path fill="#fff" d="M3.97 10.72A5.4 5.4 0 013.68 9c0-.6.1-1.18.29-1.72V4.95H.95A9 9 0 000 9c0 1.45.35 2.83.95 4.05l3.02-2.33z"/><path fill="#fff" d="M9 3.58c1.32 0 2.51.46 3.44 1.35l2.58-2.58A9 9 0 009 0 9 9 0 00.95 4.95l3.02 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
+      Entrar com Google
+    </button>
+    <p id="loginError" style="color:#C25B54;font-weight:700;"></p>
+  </div>
+</div>
+
+<!-- ================= APP SHELL ================= -->
+<div class="shell" id="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark" id="logoMark">🧵</div>
+      <div>
+        <div class="brand-name" id="brandNameLabel">Ateliê<br>Costurando Fofurices</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <button data-view="dashboard" class="active"><span class="ic">📊</span> Dashboard</button>
+      <button data-view="catalogo"><span class="ic">🧸</span> Catálogo</button>
+      <button data-view="suprimentos"><span class="ic">🧵</span> Suprimentos</button>
+      <button data-view="custos"><span class="ic">💰</span> Custos</button>
+      <button data-view="canais"><span class="ic">📣</span> Canais</button>
+      <button data-view="vendas"><span class="ic">🛍️</span> Vendas</button>
+      <button data-view="config"><span class="ic">🎨</span> Identidade Visual</button>
+    </nav>
+    <div class="spool">
+      <div class="spool-label">Margem do mês</div>
+      <div class="spool-ring">
+        <svg width="88" height="88">
+          <circle cx="44" cy="44" r="38" stroke="#F0E2E6" stroke-width="9" fill="none"/>
+          <circle id="spoolCircle" cx="44" cy="44" r="38" stroke="#8FC9A9" stroke-width="9" fill="none" stroke-linecap="round" stroke-dasharray="238.6" stroke-dashoffset="238.6"/>
+        </svg>
+        <div class="pct" id="spoolPct">–</div>
+      </div>
+      <div class="spool-note" id="spoolNote">Sem vendas registradas ainda</div>
+    </div>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;">
+      <img id="userAvatar" src="" style="width:26px;height:26px;border-radius:50%;display:none;">
+      <div style="flex:1;min-width:0;">
+        <div id="userName" style="font-size:11.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+      </div>
+      <button onclick="fazerLogout()" title="Sair" style="background:none;border:none;font-size:15px;color:var(--text-soft);padding:4px;">🚪</button>
+    </div>
+  </aside>
+
+  <main>
+    <!-- ============ DASHBOARD ============ -->
+    <section class="view active" id="view-dashboard">
+      <div class="topbar"><h1>Dashboard</h1><div class="date" id="todayLabel"></div></div>
+
+      <div class="grid cols-4">
+        <div class="card kpi"><div class="label">Receita (mês)</div><div class="value" id="kpiReceita">R$ 0</div><div class="sub" id="kpiReceitaSub">—</div></div>
+        <div class="card kpi"><div class="label">Custo total (mês)</div><div class="value" id="kpiCusto">R$ 0</div><div class="sub" id="kpiCustoSub">materiais + mão de obra + mídia + frete</div></div>
+        <div class="card kpi"><div class="label">Lucro (mês)</div><div class="value" id="kpiLucro">R$ 0</div><div class="sub" id="kpiLucroSub">—</div></div>
+        <div class="card kpi"><div class="label">Margem média</div><div class="value" id="kpiMargem">0%</div><div class="sub" id="kpiMargemSub">sobre o preço de venda</div></div>
+      </div>
+
+      <div class="section-title">
+        <h2>📦 Entregas da semana <span id="semanaCount" style="font-weight:400;color:var(--text-soft);font-size:13px;"></span></h2>
+        <button class="btn secondary small no-print" onclick="window.print()">🖨️ Imprimir lista</button>
+      </div>
+      <div class="card" id="printArea">
+        <div style="font-size:12px;color:var(--text-soft);margin-bottom:10px;" id="semanaRange"></div>
+        <div id="entregasSemanaBody"></div>
+      </div>
+
+      <div class="section-title"><h2>Receita, custo e lucro — últimos 6 meses</h2></div>
+      <div class="two-col">
+        <div class="card"><div class="chart-wrap"><canvas id="chartMeses"></canvas></div></div>
+        <div class="card"><div class="chart-wrap"><canvas id="chartCanais"></canvas></div></div>
+      </div>
+
+      <div class="section-title"><h2>Produtos mais lucrativos</h2></div>
+      <div class="card" style="padding:0;">
+        <table><thead><tr><th>Produto</th><th>Vendidos (mês)</th><th>Receita</th><th>Margem</th></tr></thead>
+        <tbody id="rankingBody"><tr><td colspan="4" class="empty">Sem dados suficientes ainda</td></tr></tbody></table>
+      </div>
+
+      <div class="section-title"><h2>⚠️ Estoque baixo</h2></div>
+      <div class="card" id="estoqueAlertCard"><div class="empty">Nenhum suprimento abaixo do mínimo 🎉</div></div>
+
+      <div class="section-title"><h2>💡 Dicas para aumentar sua margem</h2></div>
+      <div class="tip-box">
+        <b>Markup de referência:</b> para enxoval/artesanato têxtil, o mercado costuma trabalhar com preço de venda entre <b>2,5x e 3x</b> o custo direto (tecido + aviamentos + mão de obra) — abaixo disso o negócio fica no limite.<br><br>
+        <b>Margem saudável:</b> mire <b>30% a 50%</b> sobre o preço de venda em peças de linha (fraldas, mantinhas), podendo chegar a <b>60–75%</b> em peças personalizadas/bordadas e combos, que agregam mais valor percebido.<br><br>
+        <b>Ticket médio:</b> combos e kits (ex: enxoval completo) aumentam o valor médio do pedido melhor do que descontos avulsos — já é um ponto forte do catálogo do ateliê.<br><br>
+        <b>Instagram como canal:</b> com uma base grande de seguidores, vale medir na aba <i>Canais</i> quanto desse público realmente converte em venda, para saber se compensa investir em anúncios ali ou reforçar outros canais (Shopee, indicação).<br><br>
+        <b>Frete:</b> como o envio é para todo o Brasil, sempre que possível repasse o custo real do frete ao cliente; frete "grátis" absorvido sem cálculo é um dos maiores vilões silenciosos da margem.
+      </div>
+    </section>
+
+    <!-- ============ CATÁLOGO ============ -->
+    <section class="view" id="view-catalogo">
+      <div class="topbar"><h1>Catálogo</h1><button class="btn" onclick="toggleForm('produto')">+ Novo produto</button></div>
+
+      <div class="form-panel" id="form-produto">
+        <div class="form-row">
+          <div><label>Nome do produto</label><input id="p_nome" placeholder="Ex: Cueiro Flanelado"></div>
+          <div><label>Categoria</label>
+            <select id="p_categoria">
+              <option>Saquinhos para Maternidade</option>
+              <option>Enxoval</option>
+              <option>Mantinhas</option>
+              <option>Necessaires</option>
+              <option>Porta Documentos</option>
+              <option>Porta Laços</option>
+              <option>Ninho</option>
+              <option>Combos</option>
+              <option>Outro</option>
+            </select>
+          </div>
+          <div><label>Preço de venda (R$)</label><input id="p_preco" type="number" step="0.01"></div>
+        </div>
+        <div class="form-row">
+          <div><label>Custo de material (R$)</label><input id="p_custoMat" type="number" step="0.01"></div>
+          <div><label>Custo de mão de obra (R$)</label><input id="p_custoMao" type="number" step="0.01"></div>
+          <div><label>Foto</label><input id="p_foto" type="file" accept="image/*"></div>
+        </div>
+        <button class="btn" onclick="salvarProduto()">Salvar produto</button>
+        <button class="btn secondary" onclick="toggleForm('produto')">Cancelar</button>
+      </div>
+
+      <div class="grid cols-4" id="catalogoGrid"></div>
+    </section>
+
+    <!-- ============ SUPRIMENTOS ============ -->
+    <section class="view" id="view-suprimentos">
+      <div class="topbar"><h1>Controle de Suprimentos</h1><button class="btn" onclick="toggleForm('material')">+ Novo item</button></div>
+
+      <div class="form-panel" id="form-material">
+        <div class="form-row">
+          <div><label>Nome</label><input id="m_nome" placeholder="Ex: Tecido tricoline"></div>
+          <div><label>Unidade</label><input id="m_unidade" placeholder="Ex: metro, unidade, kg"></div>
+          <div><label>Estoque atual</label><input id="m_estoque" type="number" step="0.01"></div>
+        </div>
+        <div class="form-row">
+          <div><label>Estoque mínimo</label><input id="m_min" type="number" step="0.01"></div>
+          <div><label>Custo unitário (R$)</label><input id="m_custo" type="number" step="0.01"></div>
+        </div>
+        <button class="btn" onclick="salvarMaterial()">Salvar item</button>
+        <button class="btn secondary" onclick="toggleForm('material')">Cancelar</button>
+      </div>
+
+      <div class="card" style="padding:0;">
+        <table><thead><tr><th>Item</th><th>Estoque</th><th>Mínimo</th><th>Custo unit.</th><th>Status</th><th></th></tr></thead>
+        <tbody id="suprimentosBody"><tr><td colspan="6" class="empty">Nenhum item cadastrado</td></tr></tbody></table>
+      </div>
+    </section>
+
+    <!-- ============ CUSTOS ============ -->
+    <section class="view" id="view-custos">
+      <div class="topbar"><h1>Controle de Custos</h1><button class="btn" onclick="toggleForm('custo')">+ Novo lançamento</button></div>
+
+      <div class="form-panel" id="form-custo">
+        <div class="form-row">
+          <div><label>Categoria</label>
+            <select id="c_categoria"><option>Material</option><option>Funcionário</option><option>Mídia</option><option>Frete</option><option>Outro</option></select>
+          </div>
+          <div><label>Descrição</label><input id="c_desc" placeholder="Ex: Anúncio Instagram"></div>
+          <div><label>Valor (R$)</label><input id="c_valor" type="number" step="0.01"></div>
+        </div>
+        <div class="form-row">
+          <div><label>Data</label><input id="c_data" type="date"></div>
+          <div><label>Recorrente (mensal)?</label><select id="c_recorrente"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
+        </div>
+        <button class="btn" onclick="salvarCusto()">Salvar lançamento</button>
+        <button class="btn secondary" onclick="toggleForm('custo')">Cancelar</button>
+      </div>
+
+      <div class="card" style="padding:0;">
+        <table><thead><tr><th>Data</th><th>Categoria</th><th>Descrição</th><th>Valor</th><th>Recorrente</th><th></th></tr></thead>
+        <tbody id="custosBody"><tr><td colspan="6" class="empty">Nenhum custo lançado</td></tr></tbody></table>
+      </div>
+    </section>
+
+    <!-- ============ CANAIS ============ -->
+    <section class="view" id="view-canais">
+      <div class="topbar"><h1>Indicação / Canal</h1></div>
+      <div class="two-col">
+        <div class="card"><div class="chart-wrap"><canvas id="chartCanaisReceita"></canvas></div></div>
+        <div class="card"><div class="chart-wrap"><canvas id="chartCanaisQtd"></canvas></div></div>
+      </div>
+      <div class="section-title"><h2>Detalhe por canal</h2></div>
+      <div class="card" style="padding:0;">
+        <table><thead><tr><th>Canal</th><th>Vendas</th><th>Receita</th><th>% do total</th></tr></thead>
+        <tbody id="canaisBody"><tr><td colspan="4" class="empty">Sem vendas registradas ainda</td></tr></tbody></table>
+      </div>
+    </section>
+
+    <!-- ============ VENDAS ============ -->
+    <section class="view" id="view-vendas">
+      <div class="topbar"><h1>Controle de Vendas</h1><button class="btn" onclick="toggleForm('venda')">+ Nova venda</button></div>
+
+      <div class="form-panel" id="form-venda">
+        <div class="form-row">
+          <div><label>Produto</label><select id="v_produto"></select></div>
+          <div><label>Cliente</label><input id="v_cliente" placeholder="Nome do cliente"></div>
+          <div><label>Quantidade</label><input id="v_qtd" type="number" value="1" min="1"></div>
+        </div>
+        <div class="form-row">
+          <div><label>Canal</label>
+            <select id="v_canal"><option>Instagram</option><option>WhatsApp</option><option>Indicação</option><option>Shopee</option><option>Site próprio</option><option>Feira/Evento</option><option>Facebook</option><option>Outro</option></select>
+          </div>
+          <div><label>Data da venda</label><input id="v_data" type="date"></div>
+          <div><label>Data combinada de entrega</label><input id="v_prazo" type="date"></div>
+        </div>
+        <div class="form-row">
+          <div><label>Custo de frete (R$)</label><input id="v_frete" type="number" step="0.01" value="0"></div>
+          <div><label>Frete pago pelo cliente?</label><select id="v_freteCliente"><option value="sim">Sim, cliente paga</option><option value="nao">Não, eu absorvo</option></select></div>
+          <div><label>Status</label><select id="v_status"><option>Pendente</option><option>Entregue</option></select></div>
+        </div>
+        <button class="btn" onclick="salvarVenda()">Salvar venda</button>
+        <button class="btn secondary" onclick="toggleForm('venda')">Cancelar</button>
+      </div>
+
+      <div class="card" style="padding:0;">
+        <table><thead><tr><th>Data</th><th>Produto</th><th>Cliente</th><th>Canal</th><th>Valor</th><th>Entrega</th><th>Status</th><th></th></tr></thead>
+        <tbody id="vendasBody"><tr><td colspan="8" class="empty">Nenhuma venda registrada</td></tr></tbody></table>
+      </div>
+    </section>
+
+    <!-- ============ CONFIG / ID VISUAL ============ -->
+    <section class="view" id="view-config">
+      <div class="topbar"><h1>Identidade Visual</h1></div>
+      <div class="card" style="max-width:520px;">
+        <div class="form-row">
+          <div><label>Nome da marca</label><input id="cfg_nome" placeholder="Ateliê Costurando Fofurices"></div>
+        </div>
+        <div class="form-row">
+          <div><label>Logo</label><input id="cfg_logo" type="file" accept="image/*"></div>
+          <div><img class="logo-preview" id="cfg_logoPreview" src=""></div>
+        </div>
+        <div class="form-row">
+          <div>
+            <label>Cor primária</label>
+            <input id="cfg_corPrimaria" type="color" value="#E3A6AC" style="height:40px;">
+          </div>
+          <div>
+            <label>Cor secundária</label>
+            <input id="cfg_corSecundaria" type="color" value="#A8C4A2" style="height:40px;">
+          </div>
+        </div>
+        <p style="font-size:12.5px;color:var(--text-soft);">Assim que a identidade visual definitiva chegar, é só subir a logo e escolher as cores aqui — todo o sistema se atualiza automaticamente.</p>
+        <button class="btn" onclick="salvarConfig()">Salvar identidade visual</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {
+  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
+  onSnapshot, query, orderBy, setDoc, getDoc
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+/* =========================================================================
+   REGRAS_FIRESTORE — cole isto em Firestore > Regras (substituindo tudo):
+
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /{document=**} {
+         allow read, write: if request.auth != null;
+       }
+     }
+   }
+
+   Isso permite leitura/escrita apenas para usuários autenticados (o app
+   pede login com Google, então só quem entrar com uma conta Google
+   autorizada consegue acessar os dados — ninguém de fora consegue ler
+   seu Firestore).
+   ========================================================================= */
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC1Nvtq-i0Jw79TvZ7pG7AZX7GTLeaTf40",
+  authDomain: "costurando-fofurices.firebaseapp.com",
+  projectId: "costurando-fofurices",
+  storageBucket: "costurando-fofurices.firebasestorage.app",
+  messagingSenderId: "963947085184",
+  appId: "1:963947085184:web:1e317a229166ea2ecb5565"
+};
+
+const isPlaceholder = Object.values(firebaseConfig).some(v => v === "COLE_AQUI");
+
+if (isPlaceholder) {
+  document.getElementById("setupError").textContent = "Credenciais ainda não configuradas — edite o firebaseConfig no final do arquivo.";
+} else {
+  startApp();
+}
+
+async function startApp(){
+  try{
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+
+    document.getElementById("setupScreen").style.display = "none";
+
+    document.getElementById("btnGoogleLogin").addEventListener("click", async ()=>{
+      document.getElementById("loginError").textContent = "";
+      try{ await signInWithPopup(auth, provider); }
+      catch(err){ document.getElementById("loginError").textContent = "Não foi possível entrar: " + err.message; }
+    });
+
+    window.fazerLogout = ()=> signOut(auth);
+
+    onAuthStateChanged(auth, user=>{
+      if(user){
+        document.getElementById("loginScreen").style.display = "none";
+        document.getElementById("shell").classList.add("ready");
+        document.getElementById("userName").textContent = user.displayName || user.email || "";
+        if(user.photoURL){
+          document.getElementById("userAvatar").src = user.photoURL;
+          document.getElementById("userAvatar").style.display = "block";
+        }
+        if(!window.__uiStarted){ window.__uiStarted = true; initUI(db); }
+      } else {
+        document.getElementById("shell").classList.remove("ready");
+        document.getElementById("loginScreen").style.display = "flex";
+      }
+    });
+  }catch(err){
+    document.getElementById("setupError").textContent = "Erro ao conectar: " + err.message + " (confira a config no firebaseConfig).";
+    document.getElementById("setupScreen").style.display = "flex";
+  }
+}
+
+/* ================= APP STATE & LOGIC ================= */
+function initUI(db){
+  window.__db = db;
+  const state = { produtos:[], materiais:[], custos:[], vendas:[], config:{ nome:"Ateliê Costurando Fofurices", primaria:"#E3A6AC", secundaria:"#A8C4A2", logo:"" } };
+  window.__state = state;
+
+  // Navegação
+  document.querySelectorAll(".nav button").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      document.querySelectorAll(".nav button").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+      document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+      document.getElementById("view-"+btn.dataset.view).classList.add("active");
+    });
+  });
+
+  document.getElementById("todayLabel").textContent = new Date().toLocaleDateString("pt-BR",{weekday:"long", day:"2-digit", month:"long", year:"numeric"});
+  document.getElementById("v_data").value = new Date().toISOString().slice(0,10);
+  document.getElementById("c_data").value = new Date().toISOString().slice(0,10);
+
+  // Listeners em tempo real
+  onSnapshot(collection(db,"produtos"), snap=>{
+    state.produtos = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    renderCatalogo(); renderVendaProdutoOptions(); renderDashboard();
+  });
+  onSnapshot(collection(db,"materiais"), snap=>{
+    state.materiais = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    renderSuprimentos(); renderDashboard();
+  });
+  onSnapshot(collection(db,"custos"), snap=>{
+    state.custos = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    renderCustos(); renderDashboard();
+  });
+  onSnapshot(collection(db,"vendas"), snap=>{
+    state.vendas = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    renderVendas(); renderCanais(); renderDashboard();
+  });
+  getDoc(doc(db,"config","geral")).then(d=>{
+    if(d.exists()){ state.config = d.data(); applyConfig(); }
+  });
+
+  function applyConfig(){
+    document.documentElement.style.setProperty("--primary", state.config.primaria || "#E3A6AC");
+    document.documentElement.style.setProperty("--primary-dark", shade(state.config.primaria||"#E3A6AC", -18));
+    document.documentElement.style.setProperty("--secondary", state.config.secundaria || "#A8C4A2");
+    document.getElementById("brandNameLabel").innerHTML = (state.config.nome||"Ateliê Costurando Fofurices").replace(" ","<br>");
+    document.getElementById("cfg_nome").value = state.config.nome || "";
+    document.getElementById("cfg_corPrimaria").value = state.config.primaria || "#E3A6AC";
+    document.getElementById("cfg_corSecundaria").value = state.config.secundaria || "#A8C4A2";
+    if(state.config.logo){
+      document.getElementById("logoMark").innerHTML = `<img src="${state.config.logo}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+      document.getElementById("cfg_logoPreview").src = state.config.logo;
+    }
+  }
+  function shade(hex, percent){
+    const f=parseInt(hex.slice(1),16),t=percent<0?0:255,p=Math.abs(percent)/100;
+    const R=f>>16,G=f>>8&0x00FF,B=f&0x0000FF;
+    return "#"+(0x1000000+(Math.round((t-R)*p)+R)*0x10000+(Math.round((t-G)*p)+G)*0x100+(Math.round((t-B)*p)+B)).toString(16).slice(1);
+  }
+
+  /* ---------- helpers ---------- */
+  window.toggleForm = (name)=>{
+    document.getElementById("form-"+name).classList.toggle("open");
+  };
+  function fileToCompressedBase64(file, maxW=320){
+    return new Promise((resolve)=>{
+      if(!file){ resolve(""); return; }
+      const reader = new FileReader();
+      reader.onload = e=>{
+        const img = new Image();
+        img.onload = ()=>{
+          const scale = Math.min(1, maxW/img.width);
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width*scale; canvas.height = img.height*scale;
+          canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
+          resolve(canvas.toDataURL("image/jpeg", 0.72));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  function brl(n){ return (n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}); }
+  function monthKey(d){ const dt=new Date(d); return dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0"); }
+  function thisMonthKey(){ return monthKey(new Date()); }
+
+  /* ---------- PRODUTOS ---------- */
+  window.salvarProduto = async ()=>{
+    const foto = await fileToCompressedBase64(document.getElementById("p_foto").files[0]);
+    const data = {
+      nome: document.getElementById("p_nome").value.trim(),
+      categoria: document.getElementById("p_categoria").value.trim(),
+      preco: parseFloat(document.getElementById("p_preco").value)||0,
+      custoMaterial: parseFloat(document.getElementById("p_custoMat").value)||0,
+      custoMaoObra: parseFloat(document.getElementById("p_custoMao").value)||0,
+      foto: foto || ""
+    };
+    if(!data.nome || !data.preco){ alert("Preencha nome e preço."); return; }
+    await addDoc(collection(db,"produtos"), data);
+    ["p_nome","p_categoria","p_preco","p_custoMat","p_custoMao"].forEach(id=>document.getElementById(id).value="");
+    document.getElementById("p_foto").value="";
+    toggleForm("produto");
+  };
+  window.excluirProduto = async (id)=>{ if(confirm("Excluir este produto?")) await deleteDoc(doc(db,"produtos",id)); };
+
+  function margemInfo(preco, custo){
+    const lucro = preco - custo;
+    const margem = preco>0 ? (lucro/preco*100) : 0;
+    let cls = "red";
+    if(margem>=50) cls="green"; else if(margem>=30) cls="amber";
+    return {lucro, margem, cls};
+  }
+
+  function renderCatalogo(){
+    const grid = document.getElementById("catalogoGrid");
+    if(!state.produtos.length){ grid.innerHTML = '<div class="empty" style="grid-column:1/-1;">Nenhum produto cadastrado ainda.</div>'; return; }
+    grid.innerHTML = state.produtos.map(p=>{
+      const custo = (p.custoMaterial||0)+(p.custoMaoObra||0);
+      const {margem, cls} = margemInfo(p.preco, custo);
+      return `<div class="card">
+        <img class="thumb" style="width:100%;height:110px;border-radius:10px;margin-bottom:10px;" src="${p.foto || 'data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22><rect width=%22100%22 height=%22100%22 fill=%22%23F3E8EB%22/></svg>'}">
+        <div style="font-weight:700;font-size:14px;">${p.nome}</div>
+        <div style="font-size:11.5px;color:var(--text-soft);margin-bottom:8px;">${p.categoria||"—"}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-family:'Fredoka';font-size:15px;">${brl(p.preco)}</span>
+          <span class="badge ${cls}">${margem.toFixed(0)}%</span>
+        </div>
+        <div style="margin-top:10px;"><button class="btn ghost small" onclick="excluirProduto('${p.id}')">Excluir</button></div>
+      </div>`;
+    }).join("");
+  }
+  function renderVendaProdutoOptions(){
+    document.getElementById("v_produto").innerHTML = state.produtos.map(p=>`<option value="${p.id}">${p.nome} — ${brl(p.preco)}</option>`).join("");
+  }
+
+  /* ---------- SUPRIMENTOS ---------- */
+  window.salvarMaterial = async ()=>{
+    const data = {
+      nome: document.getElementById("m_nome").value.trim(),
+      unidade: document.getElementById("m_unidade").value.trim(),
+      estoque: parseFloat(document.getElementById("m_estoque").value)||0,
+      minimo: parseFloat(document.getElementById("m_min").value)||0,
+      custo: parseFloat(document.getElementById("m_custo").value)||0
+    };
+    if(!data.nome){ alert("Informe o nome do item."); return; }
+    await addDoc(collection(db,"materiais"), data);
+    ["m_nome","m_unidade","m_estoque","m_min","m_custo"].forEach(id=>document.getElementById(id).value="");
+    toggleForm("material");
+  };
+  window.excluirMaterial = async (id)=>{ if(confirm("Excluir este item?")) await deleteDoc(doc(db,"materiais",id)); };
+
+  function renderSuprimentos(){
+    const body = document.getElementById("suprimentosBody");
+    if(!state.materiais.length){ body.innerHTML = '<tr><td colspan="6" class="empty">Nenhum item cadastrado</td></tr>'; return; }
+    body.innerHTML = state.materiais.map(m=>{
+      const baixo = m.estoque <= m.minimo;
+      return `<tr>
+        <td>${m.nome}</td><td>${m.estoque} ${m.unidade||""}</td><td>${m.minimo} ${m.unidade||""}</td><td>${brl(m.custo)}</td>
+        <td><span class="badge ${baixo?"red":"green"}">${baixo?"Estoque baixo":"OK"}</span></td>
+        <td><button class="btn ghost small" onclick="excluirMaterial('${m.id}')">Excluir</button></td>
+      </tr>`;
+    }).join("");
+
+    const baixos = state.materiais.filter(m=>m.estoque<=m.minimo);
+    const alertCard = document.getElementById("estoqueAlertCard");
+    alertCard.innerHTML = baixos.length ? baixos.map(m=>`<div style="padding:6px 0;">🧵 <b>${m.nome}</b> — restam ${m.estoque} ${m.unidade||""} (mínimo: ${m.minimo})</div>`).join("") : '<div class="empty">Nenhum suprimento abaixo do mínimo 🎉</div>';
+  }
+
+  /* ---------- CUSTOS ---------- */
+  window.salvarCusto = async ()=>{
+    const data = {
+      categoria: document.getElementById("c_categoria").value,
+      descricao: document.getElementById("c_desc").value.trim(),
+      valor: parseFloat(document.getElementById("c_valor").value)||0,
+      data: document.getElementById("c_data").value || new Date().toISOString().slice(0,10),
+      recorrente: document.getElementById("c_recorrente").value
+    };
+    if(!data.valor){ alert("Informe o valor."); return; }
+    await addDoc(collection(db,"custos"), data);
+    ["c_desc","c_valor"].forEach(id=>document.getElementById(id).value="");
+    toggleForm("custo");
+  };
+  window.excluirCusto = async (id)=>{ if(confirm("Excluir este lançamento?")) await deleteDoc(doc(db,"custos",id)); };
+
+  function renderCustos(){
+    const body = document.getElementById("custosBody");
+    const ordenados = [...state.custos].sort((a,b)=> (b.data||"").localeCompare(a.data||""));
+    if(!ordenados.length){ body.innerHTML = '<tr><td colspan="6" class="empty">Nenhum custo lançado</td></tr>'; return; }
+    body.innerHTML = ordenados.map(c=>`<tr>
+      <td>${fmtData(c.data)}</td><td><span class="badge gray">${c.categoria}</span></td><td>${c.descricao||"—"}</td>
+      <td>${brl(c.valor)}</td><td>${c.recorrente==="sim"?"Mensal":"—"}</td>
+      <td><button class="btn ghost small" onclick="excluirCusto('${c.id}')">Excluir</button></td>
+    </tr>`).join("");
+  }
+  function fmtData(d){ if(!d) return "—"; const [y,m,day]=d.split("-"); return `${day}/${m}/${y}`; }
+
+  /* ---------- VENDAS ---------- */
+  window.salvarVenda = async ()=>{
+    const produtoId = document.getElementById("v_produto").value;
+    const produto = state.produtos.find(p=>p.id===produtoId);
+    if(!produto){ alert("Cadastre um produto no Catálogo primeiro."); return; }
+    const qtd = parseInt(document.getElementById("v_qtd").value)||1;
+    const data = {
+      produtoId, produtoNome: produto.nome,
+      cliente: document.getElementById("v_cliente").value.trim(),
+      qtd, preco: produto.preco, custoMaterial: produto.custoMaterial||0, custoMaoObra: produto.custoMaoObra||0,
+      canal: document.getElementById("v_canal").value,
+      data: document.getElementById("v_data").value,
+      prazo: document.getElementById("v_prazo").value,
+      frete: parseFloat(document.getElementById("v_frete").value)||0,
+      freteCliente: document.getElementById("v_freteCliente").value,
+      status: document.getElementById("v_status").value
+    };
+    await addDoc(collection(db,"vendas"), data);
+    ["v_cliente","v_frete"].forEach(id=>document.getElementById(id).value="");
+    document.getElementById("v_qtd").value=1;
+    toggleForm("venda");
+  };
+  window.excluirVenda = async (id)=>{ if(confirm("Excluir esta venda?")) await deleteDoc(doc(db,"vendas",id)); };
+  window.marcarEntregue = async (id)=>{ await updateDoc(doc(db,"vendas",id), {status:"Entregue"}); };
+
+  function renderVendas(){
+    const body = document.getElementById("vendasBody");
+    const ordenadas = [...state.vendas].sort((a,b)=> (b.data||"").localeCompare(a.data||""));
+    if(!ordenadas.length){ body.innerHTML = '<tr><td colspan="8" class="empty">Nenhuma venda registrada</td></tr>'; return; }
+    const hoje = new Date().toISOString().slice(0,10);
+    body.innerHTML = ordenadas.map(v=>{
+      const atrasado = v.status!=="Entregue" && v.prazo && v.prazo<hoje;
+      const statusBadge = v.status==="Entregue" ? '<span class="badge green">Entregue</span>' : atrasado ? '<span class="badge red">Atrasado</span>' : '<span class="badge amber">Pendente</span>';
+      return `<tr>
+        <td>${fmtData(v.data)}</td><td>${v.produtoNome} ${v.qtd>1?`x${v.qtd}`:""}</td><td>${v.cliente||"—"}</td>
+        <td><span class="badge gray">${v.canal}</span></td><td>${brl(v.preco*v.qtd)}</td><td>${fmtData(v.prazo)}</td>
+        <td>${statusBadge}</td>
+        <td>${v.status!=="Entregue" ? `<button class="btn ghost small" onclick="marcarEntregue('${v.id}')">Marcar entregue</button>` : ""} <button class="btn ghost small" onclick="excluirVenda('${v.id}')">Excluir</button></td>
+      </tr>`;
+    }).join("");
+  }
+
+  /* ---------- CANAIS ---------- */
+  let chartCanaisReceita, chartCanaisQtd, chartCanaisDash;
+  function renderCanais(){
+    const porCanal = {};
+    state.vendas.forEach(v=>{
+      const c = v.canal||"Outro";
+      porCanal[c] = porCanal[c] || {qtd:0, receita:0};
+      porCanal[c].qtd += v.qtd;
+      porCanal[c].receita += v.preco*v.qtd;
+    });
+    const canais = Object.keys(porCanal);
+    const totalReceita = canais.reduce((s,c)=>s+porCanal[c].receita,0);
+    const body = document.getElementById("canaisBody");
+    body.innerHTML = canais.length ? canais.map(c=>`<tr>
+      <td>${c}</td><td>${porCanal[c].qtd}</td><td>${brl(porCanal[c].receita)}</td>
+      <td>${totalReceita>0 ? (porCanal[c].receita/totalReceita*100).toFixed(0) : 0}%</td>
+    </tr>`).join("") : '<tr><td colspan="4" class="empty">Sem vendas registradas ainda</td></tr>';
+
+    const colors = ["#E8A0B4","#B8A4D4","#8FC9A9","#E8C070","#8FB8D8","#D48A9E"];
+    chartCanaisReceita = updateChart(chartCanaisReceita, "chartCanaisReceita", "bar", {
+      labels: canais, datasets:[{label:"Receita (R$)", data:canais.map(c=>porCanal[c].receita), backgroundColor: colors}]
+    }, {plugins:{title:{display:true,text:"Receita por canal"},legend:{display:false}}});
+
+    chartCanaisQtd = updateChart(chartCanaisQtd, "chartCanaisQtd", "doughnut", {
+      labels: canais, datasets:[{data:canais.map(c=>porCanal[c].qtd), backgroundColor: colors}]
+    }, {plugins:{title:{display:true,text:"Vendas por canal (qtd.)"}}});
+
+    chartCanaisDash = updateChart(chartCanaisDash, "chartCanais", "doughnut", {
+      labels: canais, datasets:[{data:canais.map(c=>porCanal[c].receita), backgroundColor: colors}]
+    }, {plugins:{title:{display:true,text:"Receita por canal"}}});
+  }
+
+  /* ---------- CONFIG ---------- */
+  window.salvarConfig = async ()=>{
+    const logoFile = document.getElementById("cfg_logo").files[0];
+    const logo = logoFile ? await fileToCompressedBase64(logoFile, 160) : state.config.logo;
+    const data = {
+      nome: document.getElementById("cfg_nome").value.trim() || "Ateliê Costurando Fofurices",
+      primaria: document.getElementById("cfg_corPrimaria").value,
+      secundaria: document.getElementById("cfg_corSecundaria").value,
+      logo
+    };
+    await setDoc(doc(db,"config","geral"), data);
+    state.config = data;
+    applyConfig();
+    alert("Identidade visual atualizada!");
+  };
+
+  /* ---------- ENTREGAS DA SEMANA (agrupado por pedido, não por produto) ---------- */
+  function renderEntregasSemana(){
+    const hojeStr = new Date().toISOString().slice(0,10);
+    const limite = new Date(); limite.setDate(limite.getDate()+7);
+    const limiteStr = limite.toISOString().slice(0,10);
+
+    // pendentes com prazo definido, que já venceram OU vencem nos próximos 7 dias
+    const relevantes = state.vendas.filter(v => v.status!=="Entregue" && v.prazo && v.prazo<=limiteStr);
+
+    // agrupa por PEDIDO = mesmo cliente + mesma data de entrega combinada
+    const grupos = {};
+    relevantes.forEach(v=>{
+      const key = (v.cliente||"Cliente não informado")+"|"+v.prazo;
+      if(!grupos[key]) grupos[key] = { cliente:v.cliente||"Cliente não informado", prazo:v.prazo, canal:v.canal, itens:[] };
+      grupos[key].itens.push(v.produtoNome + (v.qtd>1 ? ` (x${v.qtd})` : ""));
+    });
+    const lista = Object.values(grupos).sort((a,b)=> a.prazo.localeCompare(b.prazo));
+
+    document.getElementById("semanaCount").textContent = lista.length ? `— ${lista.length} pedido(s)` : "";
+    document.getElementById("semanaRange").textContent = lista.length
+      ? `Entregas combinadas até ${fmtData(limiteStr)} (inclui pedidos atrasados)`
+      : "";
+
+    const body = document.getElementById("entregasSemanaBody");
+    if(!lista.length){
+      body.innerHTML = '<div class="empty">Nenhuma entrega pendente para os próximos 7 dias 🎉</div>';
+      return;
+    }
+    body.innerHTML = `<table><thead><tr><th style="width:30px;"></th><th>Entrega</th><th>Cliente</th><th>Itens do pedido</th><th>Canal</th></tr></thead><tbody>` +
+      lista.map(g=>{
+        const atrasado = g.prazo < hojeStr;
+        return `<tr>
+          <td><input type="checkbox" class="entrega-check"></td>
+          <td>${fmtData(g.prazo)} ${atrasado ? '<span class="badge red">Atrasado</span>' : ''}</td>
+          <td><b>${g.cliente}</b></td>
+          <td>${g.itens.join(", ")}</td>
+          <td><span class="badge gray">${g.canal||"—"}</span></td>
+        </tr>`;
+      }).join("") + `</tbody></table>`;
+  }
+
+  /* ---------- DASHBOARD ---------- */
+  let chartMeses;
+  function renderDashboard(){
+    renderEntregasSemana();
+    const mk = thisMonthKey();
+    const vendasMes = state.vendas.filter(v=>monthKey(v.data)===mk);
+    const custosMes = state.custos.filter(c=>c.recorrente==="sim" || monthKey(c.data)===mk);
+
+    const receita = vendasMes.reduce((s,v)=>s+v.preco*v.qtd,0);
+    const custoProdutos = vendasMes.reduce((s,v)=>s+(v.custoMaterial+v.custoMaoObra)*v.qtd,0);
+    const custoFreteAbsorvido = vendasMes.reduce((s,v)=> s + (v.freteCliente==="nao" ? v.frete : 0), 0);
+    const custosGerais = custosMes.reduce((s,c)=>s+c.valor,0);
+    const custoTotal = custoProdutos + custoFreteAbsorvido + custosGerais;
+    const lucro = receita - custoTotal;
+    const margem = receita>0 ? (lucro/receita*100) : 0;
+
+    document.getElementById("kpiReceita").textContent = brl(receita);
+    document.getElementById("kpiReceitaSub").textContent = vendasMes.length + " venda(s) no mês";
+    document.getElementById("kpiCusto").textContent = brl(custoTotal);
+    document.getElementById("kpiLucro").textContent = brl(lucro);
+    document.getElementById("kpiLucroSub").innerHTML = lucro>=0 ? '<span class="up">▲ positivo</span>' : '<span class="down">▼ negativo</span>';
+    document.getElementById("kpiMargem").textContent = margem.toFixed(1)+"%";
+
+    // Carretel (spool) da sidebar
+    const clamped = Math.max(0, Math.min(100, margem));
+    const circumference = 238.6;
+    const offset = circumference - (clamped/100)*circumference;
+    document.getElementById("spoolCircle").style.strokeDashoffset = offset;
+    document.getElementById("spoolCircle").style.stroke = margem>=50 ? "#8FC9A9" : margem>=30 ? "#E8C070" : "#E8918A";
+    document.getElementById("spoolPct").textContent = vendasMes.length ? margem.toFixed(0)+"%" : "–";
+    document.getElementById("spoolNote").textContent = !vendasMes.length ? "Sem vendas registradas ainda" : margem>=50 ? "Margem ótima 🎉" : margem>=30 ? "Margem saudável" : "Abaixo do ideal (30-50%)";
+
+    // Ranking produtos
+    const porProduto = {};
+    vendasMes.forEach(v=>{
+      porProduto[v.produtoId] = porProduto[v.produtoId] || {nome:v.produtoNome, qtd:0, receita:0, custo:0};
+      porProduto[v.produtoId].qtd += v.qtd;
+      porProduto[v.produtoId].receita += v.preco*v.qtd;
+      porProduto[v.produtoId].custo += (v.custoMaterial+v.custoMaoObra)*v.qtd;
+    });
+    const rankArr = Object.values(porProduto).sort((a,b)=>b.receita-a.receita);
+    const rankBody = document.getElementById("rankingBody");
+    rankBody.innerHTML = rankArr.length ? rankArr.slice(0,6).map(p=>{
+      const {margem:mg, cls} = margemInfo(p.receita, p.custo);
+      return `<tr><td>${p.nome}</td><td>${p.qtd}</td><td>${brl(p.receita)}</td><td><span class="badge ${cls}">${mg.toFixed(0)}%</span></td></tr>`;
+    }).join("") : '<tr><td colspan="4" class="empty">Sem dados suficientes ainda</td></tr>';
+
+    // Gráfico últimos 6 meses
+    const meses = [];
+    for(let i=5;i>=0;i--){
+      const d = new Date(); d.setMonth(d.getMonth()-i);
+      meses.push({key: monthKey(d), label: d.toLocaleDateString("pt-BR",{month:"short"})});
+    }
+    const receitaPorMes = meses.map(m=> state.vendas.filter(v=>monthKey(v.data)===m.key).reduce((s,v)=>s+v.preco*v.qtd,0));
+    const custoPorMes = meses.map(m=>{
+      const vs = state.vendas.filter(v=>monthKey(v.data)===m.key);
+      const cs = state.custos.filter(c=> c.recorrente==="sim" || monthKey(c.data)===m.key);
+      return vs.reduce((s,v)=>s+(v.custoMaterial+v.custoMaoObra)*v.qtd + (v.freteCliente==="nao"?v.frete:0),0) + cs.reduce((s,c)=>s+c.valor,0);
+    });
+    const lucroPorMes = meses.map((m,i)=> receitaPorMes[i]-custoPorMes[i]);
+
+    chartMeses = updateChart(chartMeses, "chartMeses", "bar", {
+      labels: meses.map(m=>m.label),
+      datasets:[
+        {label:"Receita", data:receitaPorMes, backgroundColor:"#B8A4D4"},
+        {label:"Custo", data:custoPorMes, backgroundColor:"#E8918A"},
+        {label:"Lucro", data:lucroPorMes, backgroundColor:"#8FC9A9"}
+      ]
+    }, {plugins:{title:{display:false}}});
+  }
+
+  function updateChart(instance, canvasId, type, data, extraOptions){
+    if(instance){ instance.data = data; instance.update(); return instance; }
+    const ctx = document.getElementById(canvasId).getContext("2d");
+    return new Chart(ctx, { type, data, options: Object.assign({responsive:true, maintainAspectRatio:false, plugins:{legend:{position:"bottom", labels:{boxWidth:10,font:{size:11}}}}}, extraOptions) });
+  }
+
+  applyConfig();
+}
+</script>
+</body>
+</html>
