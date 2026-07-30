@@ -501,15 +501,18 @@ Maleta G | Combos</textarea>
         </div>
         <div class="form-row">
           <div><label>Status de entrega</label><select id="v_status"><option>Pendente</option><option>Entregue</option></select></div>
-          <div><label>Status de pagamento</label><select id="v_statusPagamento"><option>Pendente</option><option>Pago</option><option>Parcial</option></select></div>
           <div><label>Tipo de frete</label>
             <select id="v_tipoFrete"><option>Correios</option><option>Jadlog</option><option>Retirada local</option><option>Motoboy</option><option>Outro</option></select>
           </div>
-        </div>
-        <div class="form-row">
           <div><label>Custo de frete (R$)</label><input id="v_frete" type="number" step="0.01" value="0"></div>
+        </div>
+        <label style="display:block;margin:14px 0 6px;font-size:12px;font-weight:700;color:var(--text-soft);text-transform:uppercase;">Pagamento (pode dividir entre cartão e pix)</label>
+        <div class="form-row">
+          <div><label>Pago via Cartão (R$)</label><input id="v_pagCartao" type="number" step="0.01" value="0" oninput="atualizarResumoPagamento()"></div>
+          <div><label>Pago via Pix (R$)</label><input id="v_pagPix" type="number" step="0.01" value="0" oninput="atualizarResumoPagamento()"></div>
           <div><label>Frete pago pelo cliente?</label><select id="v_freteCliente"><option value="sim">Sim, cliente paga</option><option value="nao">Não, eu absorvo</option></select></div>
         </div>
+        <div id="pagamentoResumo" style="font-size:12.5px;color:var(--text-soft);margin-bottom:14px;"></div>
         <button class="btn" id="btnSalvarVenda" onclick="salvarVenda()">Salvar venda</button>
         <button class="btn secondary" onclick="limparFormVenda(); toggleForm('venda')">Cancelar</button>
       </div>
@@ -991,6 +994,7 @@ function initUI(db){
   /* ---------- VENDAS (pedido com múltiplos itens) ---------- */
   let vendaEditandoId = null;
   let carrinho = []; // [{produtoId, produtoNome, preco, qtd, custoMaterial, custoMaoObra}]
+  const TAXA_CARTAO = 0.0303; // 3,03% de perda em pagamentos no cartão
 
   // Compatível com vendas antigas (1 produto por doc) e novas (itens[])
   function itensDaVenda(v){
@@ -1002,6 +1006,20 @@ function initUI(db){
   function custoProdutosVenda(v){ return itensDaVenda(v).reduce((s,i)=>s+(i.custoMaterial+i.custoMaoObra)*i.qtd,0); }
   function qtdVenda(v){ return itensDaVenda(v).reduce((s,i)=>s+i.qtd,0); }
   function resumoItens(v){ return itensDaVenda(v).map(i=> i.produtoNome + (i.qtd>1?` (x${i.qtd})`:"")).join(", "); }
+
+  // Pagamento: compatível com vendas antigas (só tinham statusPagamento) e novas (cartão+pix)
+  function totalPagoVenda(v){
+    if(v.pagamentoCartao!==undefined || v.pagamentoPix!==undefined) return (v.pagamentoCartao||0)+(v.pagamentoPix||0);
+    if(v.statusPagamento==="Pago") return totalVenda(v);
+    return 0;
+  }
+  function taxaCartaoVenda(v){ return (v.pagamentoCartao||0) * TAXA_CARTAO; }
+  function statusPagamentoCalc(v){
+    const total = totalVenda(v), pago = totalPagoVenda(v);
+    if(pago<=0.004) return "Pendente";
+    if(pago >= total-0.01) return "Pago";
+    return "Parcial";
+  }
 
   function renderCarrinho(){
     const lista = document.getElementById("carrinhoLista");
@@ -1016,7 +1034,22 @@ function initUI(db){
     }
     const total = carrinho.reduce((s,i)=>s+i.preco*i.qtd,0);
     document.getElementById("carrinhoTotal").textContent = carrinho.length ? `Total do pedido: ${brl(total)}` : "";
+    atualizarResumoPagamento();
   }
+
+  window.atualizarResumoPagamento = ()=>{
+    const total = carrinho.reduce((s,i)=>s+i.preco*i.qtd,0);
+    const pagCartao = parseFloat(document.getElementById("v_pagCartao").value)||0;
+    const pagPix = parseFloat(document.getElementById("v_pagPix").value)||0;
+    const pago = pagCartao+pagPix;
+    const taxa = pagCartao*TAXA_CARTAO;
+    const falta = total-pago;
+    let linha = `Total do pedido: ${brl(total)} · Pago: ${brl(pago)}`;
+    if(taxa>0) linha += ` · Taxa do cartão (3,03%): -${brl(taxa)}`;
+    if(falta>0.004) linha += ` · Falta: ${brl(falta)}`;
+    else if(carrinho.length) linha += ` · <span class="up">Pago integralmente ✓</span>`;
+    document.getElementById("pagamentoResumo").innerHTML = linha;
+  };
 
   window.adicionarItemCarrinho = ()=>{
     const produtoId = document.getElementById("v_produto").value;
@@ -1049,11 +1082,12 @@ function initUI(db){
       tipoFrete: document.getElementById("v_tipoFrete").value,
       freteCliente: document.getElementById("v_freteCliente").value,
       status: document.getElementById("v_status").value,
-      statusPagamento: document.getElementById("v_statusPagamento").value
+      pagamentoCartao: parseFloat(document.getElementById("v_pagCartao").value)||0,
+      pagamentoPix: parseFloat(document.getElementById("v_pagPix").value)||0
     };
     if(vendaEditandoId){
-      // limpa campos antigos de item único ao migrar uma venda antiga para o novo formato
-      await updateDoc(doc(db,"vendas",vendaEditandoId), {...data, produtoId:null, produtoNome:null, preco:null, qtd:null, custoMaterial:null, custoMaoObra:null});
+      // limpa campos antigos de item único / status manual ao migrar uma venda antiga para o novo formato
+      await updateDoc(doc(db,"vendas",vendaEditandoId), {...data, produtoId:null, produtoNome:null, preco:null, qtd:null, custoMaterial:null, custoMaoObra:null, statusPagamento:null});
     } else {
       await addDoc(collection(db,"vendas"), data);
     }
@@ -1070,9 +1104,11 @@ function initUI(db){
     document.getElementById("v_estado").value = "";
     document.getElementById("v_qtd").value = 1;
     document.getElementById("v_status").value = "Pendente";
-    document.getElementById("v_statusPagamento").value = "Pendente";
+    document.getElementById("v_pagCartao").value = 0;
+    document.getElementById("v_pagPix").value = 0;
     document.getElementById("v_freteCliente").value = "sim";
     document.getElementById("v_tipoFrete").value = "Correios";
+    atualizarResumoPagamento();
   }
 
   window.editarVenda = (id)=>{
@@ -1093,8 +1129,10 @@ function initUI(db){
     document.getElementById("v_tipoFrete").value = v.tipoFrete||"Correios";
     document.getElementById("v_freteCliente").value = v.freteCliente||"sim";
     document.getElementById("v_status").value = v.status||"Pendente";
-    document.getElementById("v_statusPagamento").value = v.statusPagamento||"Pendente";
+    document.getElementById("v_pagCartao").value = v.pagamentoCartao || (v.statusPagamento==="Pago" ? totalVenda(v) : 0);
+    document.getElementById("v_pagPix").value = v.pagamentoPix || 0;
     document.getElementById("btnSalvarVenda").textContent = "Salvar alterações";
+    atualizarResumoPagamento();
     fecharDetalheVenda();
     document.getElementById("form-venda").classList.add("open");
     document.getElementById("form-venda").scrollIntoView({behavior:"smooth", block:"center"});
@@ -1111,8 +1149,9 @@ function initUI(db){
   }
 
   function badgePagamento(v){
-    if(v.statusPagamento==="Pago") return '<span class="badge green">Pago</span>';
-    if(v.statusPagamento==="Parcial") return '<span class="badge amber">Parcial</span>';
+    const s = statusPagamentoCalc(v);
+    if(s==="Pago") return '<span class="badge green">Pago</span>';
+    if(s==="Parcial") return '<span class="badge amber">Parcial</span>';
     return '<span class="badge red">Pendente</span>';
   }
   function badgeEntrega(v){
@@ -1146,6 +1185,14 @@ function initUI(db){
         <tr><td style="color:var(--text-soft);padding:6px 0;">Data da venda</td><td style="text-align:right;">${fmtData(v.data)}</td></tr>
         <tr><td style="color:var(--text-soft);padding:6px 0;">Data combinada de entrega</td><td style="text-align:right;">${fmtData(v.prazo)}</td></tr>
         <tr><td style="color:var(--text-soft);padding:6px 0;">Frete</td><td style="text-align:right;">${brl(v.frete)} · <span class="badge gray">${v.tipoFrete||"—"}</span> ${v.freteCliente==="sim"?"(cliente paga)":"(você absorve)"}</td></tr>
+      </table>
+      <div style="margin:12px 0 4px;font-size:11.5px;font-weight:700;color:var(--text-soft);text-transform:uppercase;">Pagamento</div>
+      <table style="width:100%;font-size:13.5px;">
+        <tr><td style="color:var(--text-soft);padding:4px 0;">Via Cartão</td><td style="text-align:right;">${brl(v.pagamentoCartao||0)}</td></tr>
+        ${(v.pagamentoCartao||0)>0 ? `<tr><td style="color:var(--coral);padding:4px 0;">Taxa do cartão (3,03%)</td><td style="text-align:right;color:var(--coral);">-${brl(taxaCartaoVenda(v))}</td></tr>` : ""}
+        <tr><td style="color:var(--text-soft);padding:4px 0;">Via Pix</td><td style="text-align:right;">${brl(v.pagamentoPix||0)}</td></tr>
+        <tr><td style="padding:4px 0;font-weight:700;">Total pago</td><td style="text-align:right;font-weight:700;">${brl(totalPagoVenda(v))}</td></tr>
+        ${totalVenda(v)-totalPagoVenda(v) > 0.01 ? `<tr><td style="color:var(--coral);padding:4px 0;">Falta receber</td><td style="text-align:right;color:var(--coral);">${brl(totalVenda(v)-totalPagoVenda(v))}</td></tr>` : ""}
       </table>
       <div style="display:flex;gap:8px;margin-top:16px;">
         <button class="btn small" onclick="editarVenda('${v.id}')">✏️ Editar</button>
@@ -1293,10 +1340,11 @@ function initUI(db){
     const custoFreteAbsorvido = vendasMes.reduce((s,v)=> s + (v.freteCliente==="nao" ? v.frete : 0), 0);
     const custosGerais = custosMes.reduce((s,c)=>s+c.valor,0);
     const custoSuprimentos = comprasMes.reduce((s,m)=>s+(m.valor||0)+(m.frete||0),0);
-    const custoTotal = custoProdutos + custoFreteAbsorvido + custosGerais + custoSuprimentos;
+    const custoTaxaCartao = vendasMes.reduce((s,v)=>s+taxaCartaoVenda(v),0);
+    const custoTotal = custoProdutos + custoFreteAbsorvido + custosGerais + custoSuprimentos + custoTaxaCartao;
     const lucro = receita - custoTotal;
     const margem = receita>0 ? (lucro/receita*100) : 0;
-    return { vendasMes, custosMes, comprasMes, receita, custoProdutos, custoFreteAbsorvido, custosGerais, custoSuprimentos, custoTotal, lucro, margem };
+    return { vendasMes, custosMes, comprasMes, receita, custoProdutos, custoFreteAbsorvido, custosGerais, custoSuprimentos, custoTaxaCartao, custoTotal, lucro, margem };
   }
 
   function renderDashboard(){
@@ -1393,10 +1441,11 @@ function initUI(db){
       }
     }
     if(atual.custoSuprimentos>0) insights.push(`<b>Suprimentos:</b> você gastou ${brl(atual.custoSuprimentos)} em compras de material este mês — já contabilizado no custo total acima.`);
+    if(atual.custoTaxaCartao>0) insights.push(`<b>Taxa de cartão:</b> você perdeu ${brl(atual.custoTaxaCartao)} em taxas (3,03%) nos pagamentos no cartão este mês — já contabilizado no custo total acima.`);
 
-    const pendentesPagamento = vendasMes.filter(v=> v.statusPagamento!=="Pago");
+    const pendentesPagamento = vendasMes.filter(v=> statusPagamentoCalc(v)!=="Pago");
     if(pendentesPagamento.length){
-      const valorPendente = pendentesPagamento.reduce((s,v)=> s+totalVenda(v), 0);
+      const valorPendente = pendentesPagamento.reduce((s,v)=> s+(totalVenda(v)-totalPagoVenda(v)), 0);
       insights.push(`<b>A receber:</b> ${brl(valorPendente)} ainda não recebidos (${pendentesPagamento.length} venda(s) pendente/parcial) — vale cobrar antes de fechar o mês.`);
     }
 
@@ -1413,7 +1462,7 @@ function initUI(db){
       const vs = state.vendas.filter(v=>monthKey(v.data)===m.key);
       const cs = state.custos.filter(c=> c.recorrente==="sim" || monthKey(c.data)===m.key);
       const ms = state.materiais.filter(mm=>monthKey(mm.dataCompra)===m.key);
-      return vs.reduce((s,v)=>s+custoProdutosVenda(v) + (v.freteCliente==="nao"?v.frete:0),0) + cs.reduce((s,c)=>s+c.valor,0) + ms.reduce((s,mm)=>s+(mm.valor||0)+(mm.frete||0),0);
+      return vs.reduce((s,v)=>s+custoProdutosVenda(v) + (v.freteCliente==="nao"?v.frete:0) + taxaCartaoVenda(v),0) + cs.reduce((s,c)=>s+c.valor,0) + ms.reduce((s,mm)=>s+(mm.valor||0)+(mm.frete||0),0);
     });
     const lucroPorMes = meses.map((m,i)=> receitaPorMes[i]-custoPorMes[i]);
 
