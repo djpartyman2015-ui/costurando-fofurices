@@ -270,7 +270,103 @@ tr:last-child td{border-bottom:none;}
 
     <!-- ============ CATÁLOGO ============ -->
     <section class="view" id="view-catalogo">
-      <div class="topbar"><h1>Catálogo</h1><button class="btn" onclick="novoProduto()">+ Novo produto</button></div>
+      <div class="topbar"><h1>Catálogo</h1>
+        <div style="display:flex;gap:8px;">
+          <button class="btn secondary" onclick="toggleForm('import')">📋 Importar vários</button>
+          <button class="btn" onclick="novoProduto()">+ Novo produto</button>
+        </div>
+      </div>
+
+      <div class="form-panel" id="form-import">
+        <p style="font-size:13px;color:var(--text-soft);margin-top:0;">Um produto por linha, no formato <b>Nome | Categoria</b> (a categoria é opcional — se deixar em branco, usa a categoria padrão selecionada abaixo). Já deixei a lista do ateliê pronta pra importar. Depois, é só entrar em cada produto e preencher preço e custos pela edição.</p>
+        <div class="form-row">
+          <div><label>Categoria padrão (para linhas sem categoria)</label>
+            <select id="import_categoriaPadrao">
+              <option>Saquinhos para Maternidade</option>
+              <option>Enxoval</option>
+              <option>Mantinhas</option>
+              <option>Necessaires</option>
+              <option>Porta Documentos</option>
+              <option>Porta Laços</option>
+              <option>Ninho</option>
+              <option>Combos</option>
+              <option>Outro</option>
+            </select>
+          </div>
+          <div><label>Preço de venda inicial para todos (R$, ajustável depois)</label><input id="import_precoPadrao" type="number" step="0.01" value="0"></div>
+        </div>
+        <textarea id="import_lista" rows="14" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:9px;font-size:13px;font-family:monospace;">Porta caderneta vacinação - BROCHURA | Porta Documentos
+Porta caderneta vacinação - ESPIRAL | Porta Documentos
+Capa plástica | Porta Documentos
+Porta Certidão com nome | Porta Documentos
+Porta Certidão sem nome | Porta Documentos
+Mini Carteirinha | Porta Documentos
+Pasta Gestante | Enxoval
+Add 10 saquinhos plasticos | Outro
+Manta carneirinho | Mantinhas
+Cueiro flanelado | Mantinhas
+Manta cueiro | Mantinhas
+Ninho redutor | Ninho
+Bolsa térmica de sementes | Outro
+Porta Laços | Porta Laços
+Cabide | Outro
+Trocador Portátil | Enxoval
+Necessaire Porta fraldas sem nome | Necessaires
+Necessaire Porta fraldas com nome simples | Necessaires
+Necessaire Porta fraldas com nome composto | Necessaires
+Necessaire P sem nome | Necessaires
+Necessaire P com nome simples | Necessaires
+Necessaire P com nome composto | Necessaires
+Necessaire G sem nome | Necessaires
+Necessaire G com nome simples | Necessaires
+Necessaire G com nome composto | Necessaires
+Toalha fralda sem nome | Enxoval
+Toalha fralda com nome simples | Enxoval
+Toalha fralda com nome composto | Enxoval
+Fralda Passeio sem nome | Enxoval
+Fralda Passeio com nome simples | Enxoval
+Fralda Passeio com nome composto | Enxoval
+Fralda cantinho | Enxoval
+Fralda boca slim sem nome | Enxoval
+Fralda boca slim com nome simples | Enxoval
+Fralda boca slim com nome composto | Enxoval
+Fralda ombro slim sem nome | Enxoval
+Fralda ombro slim com nome simples | Enxoval
+Fralda ombro slim com nome composto | Enxoval
+Fralda boca sem nome | Enxoval
+Fralda boca com nome simples | Enxoval
+Fralda boca com nome composto | Enxoval
+Fralda ombro sem nome | Enxoval
+Fralda ombro com nome simples | Enxoval
+Fralda ombro com nome composto | Enxoval
+Case Plastico | Porta Documentos
+Saquinho P sem nome | Saquinhos para Maternidade
+Saquinho P com nome simples | Saquinhos para Maternidade
+Saquinho P com nome composto | Saquinhos para Maternidade
+Saquinho M sem nome | Saquinhos para Maternidade
+Saquinho M com nome simples | Saquinhos para Maternidade
+Saquinho M com nome composto | Saquinhos para Maternidade
+Saquinho G sem nome | Saquinhos para Maternidade
+Saquinho G com nome simples | Saquinhos para Maternidade
+Saquinho G com nome composto | Saquinhos para Maternidade
+Saquinho Roupa suja sem nome | Saquinhos para Maternidade
+Saquinho Roupa suja com nome simples | Saquinhos para Maternidade
+Saquinho Roupa suja com nome composto | Saquinhos para Maternidade
+Tag de identificação | Outro
+Kit lençol 2 peças | Enxoval
+Kit lençol 3 peças | Enxoval
+Lençol elástico avulso | Enxoval
+Toalha Batismo | Enxoval
+Porta Passaporte com ziper | Porta Documentos
+Porta Passaporte com imã | Porta Documentos
+Maleta P | Combos
+Maleta M | Combos
+Maleta G | Combos</textarea>
+        <div style="margin-top:10px;display:flex;gap:8px;">
+          <button class="btn" id="btnImportar" onclick="importarProdutos()">Cadastrar todos</button>
+          <button class="btn secondary" onclick="toggleForm('import')">Cancelar</button>
+        </div>
+      </div>
 
       <div class="form-panel" id="form-produto">
         <div class="form-row">
@@ -657,6 +753,36 @@ function initUI(db){
     document.getElementById("form-produto").classList.add("open");
     document.getElementById("form-produto").scrollIntoView({behavior:"smooth", block:"start"});
   };
+
+  window.importarProdutos = async ()=>{
+    const categoriasValidas = ["Saquinhos para Maternidade","Enxoval","Mantinhas","Necessaires","Porta Documentos","Porta Laços","Ninho","Combos","Outro"];
+    const categoriaPadrao = document.getElementById("import_categoriaPadrao").value;
+    const precoPadrao = parseFloat(document.getElementById("import_precoPadrao").value)||0;
+    const linhas = document.getElementById("import_lista").value.split("\n").map(l=>l.trim()).filter(Boolean);
+    if(!linhas.length){ alert("Cole ou digite ao menos um produto, um por linha."); return; }
+    if(!confirm(`Isso vai cadastrar ${linhas.length} produto(s) no Catálogo. Continuar?`)) return;
+
+    const btn = document.getElementById("btnImportar");
+    btn.disabled = true;
+    let count = 0;
+    for(const linha of linhas){
+      const partes = linha.split("|").map(p=>p.trim());
+      const nome = partes[0];
+      let categoria = partes[1] || categoriaPadrao;
+      if(!categoriasValidas.includes(categoria)) categoria = categoriaPadrao;
+      if(!nome) continue;
+      btn.textContent = `Cadastrando... (${count+1}/${linhas.length})`;
+      await addDoc(collection(db,"produtos"), {
+        nome, categoria, preco: precoPadrao, custoMaterial: 0, custoMaoObra: 0, foto: ""
+      });
+      count++;
+    }
+    btn.disabled = false;
+    btn.textContent = "Cadastrar todos";
+    alert(`${count} produto(s) cadastrado(s)! Agora é só entrar em cada um (botão Editar) e preencher preço de venda e custos.`);
+    toggleForm("import");
+  };
+
   window.editarProduto = (id)=>{
     const p = state.produtos.find(x=>x.id===id);
     if(!p) return;
@@ -957,7 +1083,7 @@ function initUI(db){
       <div style="display:flex;gap:8px;margin-bottom:12px;">${badgeEntrega(v)} ${badgePagamento(v)}</div>
       <table style="width:100%;font-size:13.5px;">
         <tr><td style="color:var(--text-soft);padding:6px 0;">Cliente</td><td style="text-align:right;font-weight:700;">${v.cliente||"—"} ${v.estado?`(${v.estado})`:""}</td></tr>
-        <tr><td style="color:var(--text-soft);padding:6px 0;">WhatsApp</td><td style="text-align:right;">${v.whatsapp || "—"} ${wpp?`<a href="${wpp}" target="_blank" class="btn ghost small" style="text-decoration:none;">💬 Conversar</a>`:""}</td></tr>
+        <tr><td style="color:var(--text-soft);padding:6px 0;">WhatsApp</td><td style="text-align:right;">${v.whatsapp || "—"} ${wpp?`<a href="${wpp}" target="_blank" class="btn ghost small" style="text-decoration:none;">💬 Conversar</a>`:`<button class="btn ghost small" onclick="editarVenda('${v.id}')">Adicionar número</button>`}</td></tr>
         <tr><td style="color:var(--text-soft);padding:6px 0;">Produto</td><td style="text-align:right;">${v.produtoNome} ${v.qtd>1?`(x${v.qtd})`:""}</td></tr>
         <tr><td style="color:var(--text-soft);padding:6px 0;">Preço unitário</td><td style="text-align:right;">${brl(v.preco)}</td></tr>
         <tr><td style="color:var(--text-soft);padding:6px 0;">Valor total</td><td style="text-align:right;font-weight:700;">${brl(valorTotal)}</td></tr>
@@ -986,7 +1112,7 @@ function initUI(db){
         <td><span class="badge gray">${v.canal}</span></td><td>${brl(v.preco*v.qtd)}</td><td>${fmtData(v.prazo)}</td>
         <td>${badgeEntrega(v)}</td><td>${badgePagamento(v)}</td>
         <td style="white-space:nowrap;" onclick="event.stopPropagation()">
-          ${wpp ? `<a href="${wpp}" target="_blank" class="btn ghost small" style="text-decoration:none;">💬</a>` : ""}
+          ${wpp ? `<a href="${wpp}" target="_blank" class="btn ghost small" style="text-decoration:none;">💬 WhatsApp</a>` : `<button class="btn ghost small" onclick="editarVenda('${v.id}')" title="Cadastrar WhatsApp deste cliente">💬 Add. WhatsApp</button>`}
           <button class="btn ghost small" onclick="editarVenda('${v.id}')">Editar</button>
           ${v.status!=="Entregue" ? `<button class="btn ghost small" onclick="marcarEntregue('${v.id}')">Entregue</button>` : ""}
           <button class="btn ghost small" onclick="excluirVenda('${v.id}')">Excluir</button>
