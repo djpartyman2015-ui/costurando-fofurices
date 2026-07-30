@@ -2,8 +2,23 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Ateliê Costurando Fofurices — Gestão</title>
+
+<!-- PWA: instalar como app na tela inicial -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#E8A9BC">
+
+<!-- iOS (iPhone/iPad) -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fofurices">
+<link rel="apple-touch-icon" href="icon-512.png">
+
+<!-- Android / Chrome -->
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script>
@@ -55,7 +70,7 @@ input,select,textarea{font-family:inherit;}
 .setup-card ol{padding-left:20px;line-height:1.9;font-size:14.5px;}
 
 /* ---------- SHELL ---------- */
-.shell{display:none;min-height:100vh;}
+.shell{display:none;min-height:100vh;padding-top:env(safe-area-inset-top);}
 .shell.ready{display:flex;}
 .sidebar{width:230px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:22px 16px;position:sticky;top:0;height:100vh;flex-shrink:0;}
 .brand{display:flex;align-items:center;gap:10px;margin-bottom:26px;padding:0 4px;}
@@ -248,6 +263,12 @@ tr:last-child td{border-bottom:none;}
       <div class="two-col">
         <div class="card"><div class="chart-wrap"><canvas id="chartMeses"></canvas></div></div>
         <div class="card"><div class="chart-wrap"><canvas id="chartCanais"></canvas></div></div>
+      </div>
+
+      <div class="section-title"><h2>📍 Vendas por estado & 🏆 Produtos mais vendidos</h2></div>
+      <div class="two-col">
+        <div class="card"><div class="chart-wrap"><canvas id="chartEstados"></canvas></div></div>
+        <div class="card"><div class="chart-wrap"><canvas id="chartProdutosVendidos"></canvas></div></div>
       </div>
 
       <div class="section-title"><h2>Produtos mais lucrativos</h2></div>
@@ -1317,7 +1338,7 @@ function initUI(db){
   }
 
   /* ---------- DASHBOARD (navegação por mês + comparativo + insights) ---------- */
-  let chartMeses;
+  let chartMeses, chartEstados, chartProdutosVendidos;
   let dashOffset = 0; // 0 = mês atual, -1 = mês anterior, etc.
 
   function addMonths(date, n){ const d=new Date(date); d.setMonth(d.getMonth()+n); return d; }
@@ -1478,6 +1499,33 @@ function initUI(db){
         {label:"Lucro", data:lucroPorMes, backgroundColor:"#8FC9A9"}
       ]
     }, {plugins:{title:{display:false}}});
+
+    // Vendas por Estado (UF) — histórico completo
+    const porEstado = {};
+    state.vendas.forEach(v=>{
+      const uf = v.estado || "Não informado";
+      porEstado[uf] = porEstado[uf] || {receita:0, qtd:0};
+      porEstado[uf].receita += totalVenda(v);
+      porEstado[uf].qtd += qtdVenda(v);
+    });
+    const estadosArr = Object.entries(porEstado).sort((a,b)=>b[1].receita-a[1].receita);
+    chartEstados = updateChart(chartEstados, "chartEstados", "bar", {
+      labels: estadosArr.map(e=>e[0]),
+      datasets:[{label:"Receita", data: estadosArr.map(e=>e[1].receita), backgroundColor:"#E8A9BC"}]
+    }, {indexAxis:"y", plugins:{title:{display:true,text:"Vendas por estado (UF)"},legend:{display:false}}});
+
+    // Produtos mais vendidos — histórico completo, por quantidade
+    const porProdutoQtd = {};
+    state.vendas.forEach(v=>{
+      itensDaVenda(v).forEach(i=>{
+        porProdutoQtd[i.produtoNome] = (porProdutoQtd[i.produtoNome]||0) + i.qtd;
+      });
+    });
+    const produtosArr = Object.entries(porProdutoQtd).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    chartProdutosVendidos = updateChart(chartProdutosVendidos, "chartProdutosVendidos", "bar", {
+      labels: produtosArr.map(p=>p[0]),
+      datasets:[{label:"Unidades vendidas", data: produtosArr.map(p=>p[1]), backgroundColor:"#34BCDB"}]
+    }, {indexAxis:"y", plugins:{title:{display:true,text:"Produtos mais vendidos (unidades)"},legend:{display:false}}});
   }
 
   function updateChart(instance, canvasId, type, data, extraOptions){
