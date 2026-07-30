@@ -470,11 +470,7 @@ Maleta G | Combos</textarea>
 
       <div class="form-panel" id="form-venda">
         <div class="form-row">
-          <div><label>Produto</label><select id="v_produto"></select></div>
           <div><label>Cliente</label><input id="v_cliente" placeholder="Nome do cliente"></div>
-          <div><label>Quantidade</label><input id="v_qtd" type="number" value="1" min="1"></div>
-        </div>
-        <div class="form-row">
           <div><label>WhatsApp do cliente</label><input id="v_whatsapp" type="tel" placeholder="(19) 98800-0000"></div>
           <div><label>Estado (UF)</label>
             <select id="v_estado">
@@ -482,20 +478,32 @@ Maleta G | Combos</textarea>
               <option>AC</option><option>AL</option><option>AP</option><option>AM</option><option>BA</option><option>CE</option><option>DF</option><option>ES</option><option>GO</option><option>MA</option><option>MT</option><option>MS</option><option>MG</option><option>PA</option><option>PB</option><option>PR</option><option>PE</option><option>PI</option><option>RJ</option><option>RN</option><option>RS</option><option>RO</option><option>RR</option><option>SC</option><option>SP</option><option>SE</option><option>TO</option>
             </select>
           </div>
+        </div>
+
+        <label style="display:block;margin:14px 0 6px;font-size:12px;font-weight:700;color:var(--text-soft);text-transform:uppercase;">Itens do pedido</label>
+        <div class="form-row" style="align-items:end;">
+          <div><label>Produto</label><select id="v_produto"></select></div>
+          <div><label>Quantidade</label><input id="v_qtd" type="number" value="1" min="1"></div>
+          <div><button class="btn secondary" type="button" onclick="adicionarItemCarrinho()" style="width:100%;">+ Adicionar item</button></div>
+        </div>
+        <div id="carrinhoLista" style="margin-bottom:6px;"></div>
+        <div id="carrinhoTotal" style="text-align:right;font-weight:700;font-size:14px;margin-bottom:14px;"></div>
+
+        <div class="form-row">
           <div><label>Canal</label>
             <select id="v_canal"><option>Instagram</option><option>WhatsApp</option><option>Indicação</option><option>Shopee</option><option>Site próprio</option><option>Feira/Evento</option><option>Facebook</option><option>Outro</option></select>
           </div>
-        </div>
-        <div class="form-row">
           <div><label>Data da venda</label><input id="v_data" type="date"></div>
           <div><label>Data combinada de entrega</label><input id="v_prazo" type="date"></div>
-          <div><label>Status de entrega</label><select id="v_status"><option>Pendente</option><option>Entregue</option></select></div>
         </div>
         <div class="form-row">
+          <div><label>Status de entrega</label><select id="v_status"><option>Pendente</option><option>Entregue</option></select></div>
           <div><label>Status de pagamento</label><select id="v_statusPagamento"><option>Pendente</option><option>Pago</option><option>Parcial</option></select></div>
           <div><label>Tipo de frete</label>
             <select id="v_tipoFrete"><option>Correios</option><option>Jadlog</option><option>Retirada local</option><option>Motoboy</option><option>Outro</option></select>
           </div>
+        </div>
+        <div class="form-row">
           <div><label>Custo de frete (R$)</label><input id="v_frete" type="number" step="0.01" value="0"></div>
           <div><label>Frete pago pelo cliente?</label><select id="v_freteCliente"><option value="sim">Sim, cliente paga</option><option value="nao">Não, eu absorvo</option></select></div>
         </div>
@@ -504,7 +512,7 @@ Maleta G | Combos</textarea>
       </div>
 
       <div class="card" style="padding:0;">
-        <table><thead><tr><th>Data</th><th>Produto</th><th>Cliente</th><th>Canal</th><th>Valor</th><th>Entrega</th><th>Status</th><th>Pagamento</th><th></th></tr></thead>
+        <table><thead><tr><th>Data</th><th>Itens</th><th>Cliente</th><th>Canal</th><th>Valor</th><th>Entrega</th><th>Status</th><th>Pagamento</th><th></th></tr></thead>
         <tbody id="vendasBody"><tr><td colspan="9" class="empty">Nenhuma venda registrada</td></tr></tbody></table>
       </div>
     </section>
@@ -989,20 +997,58 @@ function initUI(db){
   }
   function fmtData(d){ if(!d) return "—"; const [y,m,day]=d.split("-"); return `${day}/${m}/${y}`; }
 
-  /* ---------- VENDAS ---------- */
+  /* ---------- VENDAS (pedido com múltiplos itens) ---------- */
   let vendaEditandoId = null;
+  let carrinho = []; // [{produtoId, produtoNome, preco, qtd, custoMaterial, custoMaoObra}]
 
-  window.salvarVenda = async ()=>{
+  // Compatível com vendas antigas (1 produto por doc) e novas (itens[])
+  function itensDaVenda(v){
+    if(v.itens && v.itens.length) return v.itens;
+    if(v.produtoId) return [{produtoId:v.produtoId, produtoNome:v.produtoNome, preco:v.preco||0, qtd:v.qtd||1, custoMaterial:v.custoMaterial||0, custoMaoObra:v.custoMaoObra||0}];
+    return [];
+  }
+  function totalVenda(v){ return itensDaVenda(v).reduce((s,i)=>s+i.preco*i.qtd,0); }
+  function custoProdutosVenda(v){ return itensDaVenda(v).reduce((s,i)=>s+(i.custoMaterial+i.custoMaoObra)*i.qtd,0); }
+  function qtdVenda(v){ return itensDaVenda(v).reduce((s,i)=>s+i.qtd,0); }
+  function resumoItens(v){ return itensDaVenda(v).map(i=> i.produtoNome + (i.qtd>1?` (x${i.qtd})`:"")).join(", "); }
+
+  function renderCarrinho(){
+    const lista = document.getElementById("carrinhoLista");
+    if(!carrinho.length){
+      lista.innerHTML = '<div class="empty" style="padding:14px;">Nenhum item adicionado ainda — escolha um produto acima e clique em "Adicionar item".</div>';
+    } else {
+      lista.innerHTML = `<table style="width:100%;font-size:13px;"><thead><tr><th>Produto</th><th>Qtd</th><th>Subtotal</th><th></th></tr></thead><tbody>` +
+        carrinho.map((item,idx)=>`<tr>
+          <td>${item.produtoNome}</td><td>${item.qtd}</td><td>${brl(item.preco*item.qtd)}</td>
+          <td><button class="btn ghost small" type="button" onclick="removerItemCarrinho(${idx})">Remover</button></td>
+        </tr>`).join("") + `</tbody></table>`;
+    }
+    const total = carrinho.reduce((s,i)=>s+i.preco*i.qtd,0);
+    document.getElementById("carrinhoTotal").textContent = carrinho.length ? `Total do pedido: ${brl(total)}` : "";
+  }
+
+  window.adicionarItemCarrinho = ()=>{
     const produtoId = document.getElementById("v_produto").value;
     const produto = state.produtos.find(p=>p.id===produtoId);
     if(!produto){ alert("Cadastre um produto no Catálogo primeiro."); return; }
     const qtd = parseInt(document.getElementById("v_qtd").value)||1;
+    const existente = carrinho.find(i=>i.produtoId===produtoId);
+    if(existente){ existente.qtd += qtd; }
+    else{
+      carrinho.push({produtoId, produtoNome:produto.nome, preco:produto.preco, qtd, custoMaterial:produto.custoMaterial||0, custoMaoObra:produto.custoMaoObra||0});
+    }
+    document.getElementById("v_qtd").value = 1;
+    renderCarrinho();
+  };
+  window.removerItemCarrinho = (idx)=>{ carrinho.splice(idx,1); renderCarrinho(); };
+
+  window.salvarVenda = async ()=>{
+    if(!carrinho.length){ alert("Adicione ao menos um item ao pedido."); return; }
     const data = {
-      produtoId, produtoNome: produto.nome,
+      itens: carrinho.map(i=>({...i})),
       cliente: document.getElementById("v_cliente").value.trim(),
       whatsapp: document.getElementById("v_whatsapp").value.trim(),
       estado: document.getElementById("v_estado").value,
-      qtd, preco: produto.preco, custoMaterial: produto.custoMaterial||0, custoMaoObra: produto.custoMaoObra||0,
       canal: document.getElementById("v_canal").value,
       data: document.getElementById("v_data").value,
       prazo: document.getElementById("v_prazo").value,
@@ -1013,7 +1059,8 @@ function initUI(db){
       statusPagamento: document.getElementById("v_statusPagamento").value
     };
     if(vendaEditandoId){
-      await updateDoc(doc(db,"vendas",vendaEditandoId), data);
+      // limpa campos antigos de item único ao migrar uma venda antiga para o novo formato
+      await updateDoc(doc(db,"vendas",vendaEditandoId), {...data, produtoId:null, produtoNome:null, preco:null, qtd:null, custoMaterial:null, custoMaoObra:null});
     } else {
       await addDoc(collection(db,"vendas"), data);
     }
@@ -1023,6 +1070,8 @@ function initUI(db){
 
   function limparFormVenda(){
     vendaEditandoId = null;
+    carrinho = [];
+    renderCarrinho();
     document.getElementById("btnSalvarVenda").textContent = "Salvar venda";
     ["v_cliente","v_whatsapp","v_frete"].forEach(id=>document.getElementById(id).value="");
     document.getElementById("v_estado").value = "";
@@ -1037,11 +1086,11 @@ function initUI(db){
     const v = state.vendas.find(x=>x.id===id);
     if(!v) return;
     vendaEditandoId = id;
-    document.getElementById("v_produto").value = v.produtoId;
+    carrinho = itensDaVenda(v).map(i=>({...i}));
+    renderCarrinho();
     document.getElementById("v_cliente").value = v.cliente||"";
     document.getElementById("v_whatsapp").value = v.whatsapp||"";
     document.getElementById("v_estado").value = v.estado||"";
-    document.getElementById("v_qtd").value = v.qtd||1;
     document.getElementById("v_canal").value = v.canal||"Instagram";
     document.getElementById("v_data").value = v.data||"";
     document.getElementById("v_prazo").value = v.prazo||"";
@@ -1084,15 +1133,18 @@ function initUI(db){
     const v = state.vendas.find(x=>x.id===id);
     if(!v) return;
     const wpp = linkWhatsApp(v.whatsapp);
-    const valorTotal = v.preco*v.qtd;
+    const itens = itensDaVenda(v);
+    const linhasItens = itens.map(i=>`<tr><td style="color:var(--text-soft);padding:4px 0;">${i.produtoNome}${i.qtd>1?` (x${i.qtd})`:""}</td><td style="text-align:right;">${brl(i.preco*i.qtd)}</td></tr>`).join("");
     document.getElementById("vendaDetalheBody").innerHTML = `
       <div style="display:flex;gap:8px;margin-bottom:12px;">${badgeEntrega(v)} ${badgePagamento(v)}</div>
       <table style="width:100%;font-size:13.5px;">
         <tr><td style="color:var(--text-soft);padding:6px 0;">Cliente</td><td style="text-align:right;font-weight:700;">${v.cliente||"—"} ${v.estado?`(${v.estado})`:""}</td></tr>
         <tr><td style="color:var(--text-soft);padding:6px 0;">WhatsApp</td><td style="text-align:right;">${v.whatsapp || "—"} ${wpp?`<a href="${wpp}" target="_blank" class="btn ghost small" style="text-decoration:none;">💬 Conversar</a>`:`<button class="btn ghost small" onclick="editarVenda('${v.id}')">Adicionar número</button>`}</td></tr>
-        <tr><td style="color:var(--text-soft);padding:6px 0;">Produto</td><td style="text-align:right;">${v.produtoNome} ${v.qtd>1?`(x${v.qtd})`:""}</td></tr>
-        <tr><td style="color:var(--text-soft);padding:6px 0;">Preço unitário</td><td style="text-align:right;">${brl(v.preco)}</td></tr>
-        <tr><td style="color:var(--text-soft);padding:6px 0;">Valor total</td><td style="text-align:right;font-weight:700;">${brl(valorTotal)}</td></tr>
+      </table>
+      <div style="margin:12px 0 4px;font-size:11.5px;font-weight:700;color:var(--text-soft);text-transform:uppercase;">Itens do pedido</div>
+      <table style="width:100%;font-size:13.5px;">${linhasItens}</table>
+      <table style="width:100%;font-size:13.5px;margin-top:6px;border-top:1px solid var(--border);">
+        <tr><td style="padding:6px 0;font-weight:700;">Valor total</td><td style="text-align:right;font-weight:700;">${brl(totalVenda(v))}</td></tr>
         <tr><td style="color:var(--text-soft);padding:6px 0;">Canal</td><td style="text-align:right;"><span class="badge gray">${v.canal||"—"}</span></td></tr>
         <tr><td style="color:var(--text-soft);padding:6px 0;">Data da venda</td><td style="text-align:right;">${fmtData(v.data)}</td></tr>
         <tr><td style="color:var(--text-soft);padding:6px 0;">Data combinada de entrega</td><td style="text-align:right;">${fmtData(v.prazo)}</td></tr>
@@ -1113,9 +1165,9 @@ function initUI(db){
     body.innerHTML = ordenadas.map(v=>{
       const wpp = linkWhatsApp(v.whatsapp);
       return `<tr onclick="abrirDetalheVenda('${v.id}')" style="cursor:pointer;">
-        <td>${fmtData(v.data)}</td><td>${v.produtoNome} ${v.qtd>1?`x${v.qtd}`:""}</td>
+        <td>${fmtData(v.data)}</td><td>${resumoItens(v)}</td>
         <td>${v.cliente||"—"}${v.estado?` <span class="badge gray">${v.estado}</span>`:""}</td>
-        <td><span class="badge gray">${v.canal}</span></td><td>${brl(v.preco*v.qtd)}</td><td>${fmtData(v.prazo)}</td>
+        <td><span class="badge gray">${v.canal}</span></td><td>${brl(totalVenda(v))}</td><td>${fmtData(v.prazo)}</td>
         <td>${badgeEntrega(v)}</td><td>${badgePagamento(v)}</td>
         <td style="white-space:nowrap;" onclick="event.stopPropagation()">
           ${wpp ? `<a href="${wpp}" target="_blank" class="btn ghost small" style="text-decoration:none;">💬 WhatsApp</a>` : `<button class="btn ghost small" onclick="editarVenda('${v.id}')" title="Cadastrar WhatsApp deste cliente">💬 Add. WhatsApp</button>`}
@@ -1134,8 +1186,8 @@ function initUI(db){
     state.vendas.forEach(v=>{
       const c = v.canal||"Outro";
       porCanal[c] = porCanal[c] || {qtd:0, receita:0};
-      porCanal[c].qtd += v.qtd;
-      porCanal[c].receita += v.preco*v.qtd;
+      porCanal[c].qtd += qtdVenda(v);
+      porCanal[c].receita += totalVenda(v);
     });
     const canais = Object.keys(porCanal);
     const totalReceita = canais.reduce((s,c)=>s+porCanal[c].receita,0);
@@ -1189,7 +1241,7 @@ function initUI(db){
     relevantes.forEach(v=>{
       const key = (v.cliente||"Cliente não informado")+"|"+v.prazo;
       if(!grupos[key]) grupos[key] = { cliente:v.cliente||"Cliente não informado", prazo:v.prazo, canal:v.canal, itens:[] };
-      grupos[key].itens.push(v.produtoNome + (v.qtd>1 ? ` (x${v.qtd})` : ""));
+      itensDaVenda(v).forEach(i=> grupos[key].itens.push(i.produtoNome + (i.qtd>1 ? ` (x${i.qtd})` : "")));
     });
     const lista = Object.values(grupos).sort((a,b)=> a.prazo.localeCompare(b.prazo));
 
@@ -1238,8 +1290,8 @@ function initUI(db){
   function dadosDoMes(mk){
     const vendasMes = state.vendas.filter(v=>monthKey(v.data)===mk);
     const custosMes = state.custos.filter(c=>c.recorrente==="sim" || monthKey(c.data)===mk);
-    const receita = vendasMes.reduce((s,v)=>s+v.preco*v.qtd,0);
-    const custoProdutos = vendasMes.reduce((s,v)=>s+(v.custoMaterial+v.custoMaoObra)*v.qtd,0);
+    const receita = vendasMes.reduce((s,v)=>s+totalVenda(v),0);
+    const custoProdutos = vendasMes.reduce((s,v)=>s+custoProdutosVenda(v),0);
     const custoFreteAbsorvido = vendasMes.reduce((s,v)=> s + (v.freteCliente==="nao" ? v.frete : 0), 0);
     const custosGerais = custosMes.reduce((s,c)=>s+c.valor,0);
     const custoTotal = custoProdutos + custoFreteAbsorvido + custosGerais;
@@ -1290,10 +1342,12 @@ function initUI(db){
     // Ranking produtos do mês
     const porProduto = {};
     vendasMes.forEach(v=>{
-      porProduto[v.produtoId] = porProduto[v.produtoId] || {nome:v.produtoNome, qtd:0, receita:0, custo:0};
-      porProduto[v.produtoId].qtd += v.qtd;
-      porProduto[v.produtoId].receita += v.preco*v.qtd;
-      porProduto[v.produtoId].custo += (v.custoMaterial+v.custoMaoObra)*v.qtd;
+      itensDaVenda(v).forEach(i=>{
+        porProduto[i.produtoId] = porProduto[i.produtoId] || {nome:i.produtoNome, qtd:0, receita:0, custo:0};
+        porProduto[i.produtoId].qtd += i.qtd;
+        porProduto[i.produtoId].receita += i.preco*i.qtd;
+        porProduto[i.produtoId].custo += (i.custoMaterial+i.custoMaoObra)*i.qtd;
+      });
     });
     const rankArr = Object.values(porProduto).sort((a,b)=>b.receita-a.receita);
     const rankBody = document.getElementById("rankingBody");
@@ -1307,7 +1361,7 @@ function initUI(db){
     vendasMes.forEach(v=>{
       const c = v.canal||"Outro";
       porCanalMes[c] = porCanalMes[c] || {qtd:0, receita:0};
-      porCanalMes[c].qtd += v.qtd; porCanalMes[c].receita += v.preco*v.qtd;
+      porCanalMes[c].qtd += qtdVenda(v); porCanalMes[c].receita += totalVenda(v);
     });
     const canaisArr = Object.entries(porCanalMes).sort((a,b)=>b[1].receita-a[1].receita);
 
@@ -1344,7 +1398,7 @@ function initUI(db){
 
     const pendentesPagamento = vendasMes.filter(v=> v.statusPagamento!=="Pago");
     if(pendentesPagamento.length){
-      const valorPendente = pendentesPagamento.reduce((s,v)=> s+v.preco*v.qtd, 0);
+      const valorPendente = pendentesPagamento.reduce((s,v)=> s+totalVenda(v), 0);
       insights.push(`<b>A receber:</b> ${brl(valorPendente)} ainda não recebidos (${pendentesPagamento.length} venda(s) pendente/parcial) — vale cobrar antes de fechar o mês.`);
     }
 
@@ -1356,11 +1410,11 @@ function initUI(db){
       const d = addMonths(new Date(), dashOffset-i);
       meses.push({key: monthKey(d), label: d.toLocaleDateString("pt-BR",{month:"short"})});
     }
-    const receitaPorMes = meses.map(m=> state.vendas.filter(v=>monthKey(v.data)===m.key).reduce((s,v)=>s+v.preco*v.qtd,0));
+    const receitaPorMes = meses.map(m=> state.vendas.filter(v=>monthKey(v.data)===m.key).reduce((s,v)=>s+totalVenda(v),0));
     const custoPorMes = meses.map(m=>{
       const vs = state.vendas.filter(v=>monthKey(v.data)===m.key);
       const cs = state.custos.filter(c=> c.recorrente==="sim" || monthKey(c.data)===m.key);
-      return vs.reduce((s,v)=>s+(v.custoMaterial+v.custoMaoObra)*v.qtd + (v.freteCliente==="nao"?v.frete:0),0) + cs.reduce((s,c)=>s+c.valor,0);
+      return vs.reduce((s,v)=>s+custoProdutosVenda(v) + (v.freteCliente==="nao"?v.frete:0),0) + cs.reduce((s,c)=>s+c.valor,0);
     });
     const lucroPorMes = meses.map((m,i)=> receitaPorMes[i]-custoPorMes[i]);
 
