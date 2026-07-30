@@ -479,6 +479,10 @@ Maleta G | Combos</textarea>
             </select>
           </div>
         </div>
+        <div class="form-row">
+          <div><label>Nome do bebê</label><input id="v_nomeBebe" placeholder="Ex: Maria Clara"></div>
+          <div style="grid-column:span 2;"><label>Detalhes do pedido</label><textarea id="v_detalhes" rows="2" placeholder="Cor, estampa, tamanho, bordado, observações..." style="width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:9px;font-size:13.5px;background:#fff;font-family:inherit;resize:vertical;"></textarea></div>
+        </div>
 
         <label style="display:block;margin:14px 0 6px;font-size:12px;font-weight:700;color:var(--text-soft);text-transform:uppercase;">Itens do pedido</label>
         <div class="form-row" style="align-items:end;">
@@ -1049,6 +1053,8 @@ function initUI(db){
       cliente: document.getElementById("v_cliente").value.trim(),
       whatsapp: document.getElementById("v_whatsapp").value.trim(),
       estado: document.getElementById("v_estado").value,
+      nomeBebe: document.getElementById("v_nomeBebe").value.trim(),
+      detalhes: document.getElementById("v_detalhes").value.trim(),
       canal: document.getElementById("v_canal").value,
       data: document.getElementById("v_data").value,
       prazo: document.getElementById("v_prazo").value,
@@ -1073,7 +1079,7 @@ function initUI(db){
     carrinho = [];
     renderCarrinho();
     document.getElementById("btnSalvarVenda").textContent = "Salvar venda";
-    ["v_cliente","v_whatsapp","v_frete"].forEach(id=>document.getElementById(id).value="");
+    ["v_cliente","v_whatsapp","v_frete","v_nomeBebe","v_detalhes"].forEach(id=>document.getElementById(id).value="");
     document.getElementById("v_estado").value = "";
     document.getElementById("v_qtd").value = 1;
     document.getElementById("v_status").value = "Pendente";
@@ -1091,6 +1097,8 @@ function initUI(db){
     document.getElementById("v_cliente").value = v.cliente||"";
     document.getElementById("v_whatsapp").value = v.whatsapp||"";
     document.getElementById("v_estado").value = v.estado||"";
+    document.getElementById("v_nomeBebe").value = v.nomeBebe||"";
+    document.getElementById("v_detalhes").value = v.detalhes||"";
     document.getElementById("v_canal").value = v.canal||"Instagram";
     document.getElementById("v_data").value = v.data||"";
     document.getElementById("v_prazo").value = v.prazo||"";
@@ -1140,7 +1148,9 @@ function initUI(db){
       <table style="width:100%;font-size:13.5px;">
         <tr><td style="color:var(--text-soft);padding:6px 0;">Cliente</td><td style="text-align:right;font-weight:700;">${v.cliente||"—"} ${v.estado?`(${v.estado})`:""}</td></tr>
         <tr><td style="color:var(--text-soft);padding:6px 0;">WhatsApp</td><td style="text-align:right;">${v.whatsapp || "—"} ${wpp?`<a href="${wpp}" target="_blank" class="btn ghost small" style="text-decoration:none;">💬 Conversar</a>`:`<button class="btn ghost small" onclick="editarVenda('${v.id}')">Adicionar número</button>`}</td></tr>
+        ${v.nomeBebe ? `<tr><td style="color:var(--text-soft);padding:6px 0;">Nome do bebê</td><td style="text-align:right;">👶 ${v.nomeBebe}</td></tr>` : ""}
       </table>
+      ${v.detalhes ? `<div style="margin:12px 0 4px;font-size:11.5px;font-weight:700;color:var(--text-soft);text-transform:uppercase;">Detalhes do pedido</div><div style="font-size:13.5px;background:#FCF6F3;border-radius:9px;padding:10px;line-height:1.5;">${v.detalhes}</div>` : ""}
       <div style="margin:12px 0 4px;font-size:11.5px;font-weight:700;color:var(--text-soft);text-transform:uppercase;">Itens do pedido</div>
       <table style="width:100%;font-size:13.5px;">${linhasItens}</table>
       <table style="width:100%;font-size:13.5px;margin-top:6px;border-top:1px solid var(--border);">
@@ -1166,7 +1176,7 @@ function initUI(db){
       const wpp = linkWhatsApp(v.whatsapp);
       return `<tr onclick="abrirDetalheVenda('${v.id}')" style="cursor:pointer;">
         <td>${fmtData(v.data)}</td><td>${resumoItens(v)}</td>
-        <td>${v.cliente||"—"}${v.estado?` <span class="badge gray">${v.estado}</span>`:""}</td>
+        <td>${v.cliente||"—"}${v.estado?` <span class="badge gray">${v.estado}</span>`:""}${v.nomeBebe?`<div style="font-size:11px;color:var(--text-soft);">👶 ${v.nomeBebe}</div>`:""}</td>
         <td><span class="badge gray">${v.canal}</span></td><td>${brl(totalVenda(v))}</td><td>${fmtData(v.prazo)}</td>
         <td>${badgeEntrega(v)}</td><td>${badgePagamento(v)}</td>
         <td style="white-space:nowrap;" onclick="event.stopPropagation()">
