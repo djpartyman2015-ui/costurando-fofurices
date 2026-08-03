@@ -102,9 +102,10 @@ main{flex:1;padding:26px 32px 60px;max-width:1180px;}
 
 .grid{display:grid;gap:16px;}
 .grid.cols-4{grid-template-columns:repeat(4,1fr);}
+.grid.cols-5{grid-template-columns:repeat(5,1fr);}
 .grid.cols-3{grid-template-columns:repeat(3,1fr);}
 .grid.cols-2{grid-template-columns:repeat(2,1fr);}
-@media(max-width:1000px){.grid.cols-4,.grid.cols-3,.grid.cols-2{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:1000px){.grid.cols-4,.grid.cols-3,.grid.cols-2,.grid.cols-5{grid-template-columns:repeat(2,1fr);}}
 
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;}
 .kpi .label{font-size:12px;color:var(--text-soft);font-weight:700;text-transform:uppercase;letter-spacing:.03em;}
@@ -240,11 +241,12 @@ tr:last-child td{border-bottom:none;}
         </div>
       </div>
 
-      <div class="grid cols-4">
+      <div class="grid cols-5">
         <div class="card kpi"><div class="label">Receita</div><div class="value" id="kpiReceita">R$ 0</div><div class="sub" id="kpiReceitaSub">—</div></div>
         <div class="card kpi"><div class="label">Custo total</div><div class="value" id="kpiCusto">R$ 0</div><div class="sub" id="kpiCustoSub">—</div></div>
         <div class="card kpi"><div class="label">Lucro</div><div class="value" id="kpiLucro">R$ 0</div><div class="sub" id="kpiLucroSub">—</div></div>
         <div class="card kpi"><div class="label">Margem média</div><div class="value" id="kpiMargem">0%</div><div class="sub" id="kpiMargemSub">—</div></div>
+        <div class="card kpi"><div class="label">Ticket médio / produto</div><div class="value" id="kpiTicketProduto">R$ 0</div><div class="sub" id="kpiTicketProdutoSub">—</div></div>
       </div>
 
       <div class="section-title"><h2>📊 Insights do mês</h2></div>
@@ -542,7 +544,7 @@ Maleta G | Combos</textarea>
       </div>
 
       <div class="card" style="padding:0;">
-        <table><thead><tr><th>Data</th><th>Itens</th><th>Cliente</th><th>Canal</th><th>Valor</th><th>Entrega</th><th>Status</th><th>Pagamento</th><th></th></tr></thead>
+        <table><thead><tr><th>Data</th><th>Itens</th><th>Cliente</th><th>Canal</th><th>Valor</th><th>Data Entrega</th><th>Status Entrega</th><th>Pagamento</th><th></th></tr></thead>
         <tbody id="vendasBody"><tr><td colspan="9" class="empty">Nenhuma venda registrada</td></tr></tbody></table>
       </div>
     </section>
@@ -758,7 +760,11 @@ function initUI(db){
     });
   }
   function brl(n){ return (n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}); }
-  function monthKey(d){ const dt=new Date(d); return dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0"); }
+  function monthKey(d){
+    if(!d) return "";
+    if(typeof d === "string") return d.slice(0,7); // "AAAA-MM-DD" -> "AAAA-MM", sem conversão de fuso
+    return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+  }
   function thisMonthKey(){ return monthKey(new Date()); }
 
   /* ---------- PRODUTOS ---------- */
@@ -1408,6 +1414,11 @@ function initUI(db){
     document.getElementById("kpiCustoSub").innerHTML = `<span class="${dC.cls==='up'?'down':dC.cls==='down'?'up':''}">${dC.txt}</span>`;
     document.getElementById("kpiLucroSub").innerHTML = `<span class="${dL.cls}">${dL.txt}</span>`;
     document.getElementById("kpiMargemSub").innerHTML = `<span class="${dM.cls}">${dM.txt}</span>`;
+
+    const unidadesMes = vendasMes.reduce((s,v)=>s+qtdVenda(v),0);
+    const ticketProduto = unidadesMes>0 ? receita/unidadesMes : 0;
+    document.getElementById("kpiTicketProduto").textContent = brl(ticketProduto);
+    document.getElementById("kpiTicketProdutoSub").textContent = unidadesMes ? `${unidadesMes} unidade(s) vendida(s)` : "sem vendas no mês";
 
     // Carretel (spool) da sidebar — sempre reflete o mês selecionado
     const clamped = Math.max(0, Math.min(100, margem));
