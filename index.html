@@ -273,6 +273,18 @@ tr:last-child td{border-bottom:none;}
         <div class="card"><div class="chart-wrap"><canvas id="chartProdutosVendidos"></canvas></div></div>
       </div>
 
+      <div class="section-title"><h2>💸 Despesas por categoria — últimos 6 meses</h2></div>
+      <div class="card"><div class="chart-wrap"><canvas id="chartDespesas"></canvas></div></div>
+
+      <div class="section-title"><h2>💳 Recebido x Pendente (todas as vendas)</h2></div>
+      <div class="two-col">
+        <div class="card"><div class="chart-wrap small"><canvas id="chartPagoPendente"></canvas></div></div>
+        <div class="card kpi" style="display:flex;flex-direction:column;justify-content:center;gap:14px;">
+          <div><div class="label">Já recebido</div><div class="value up" id="kpiRecebido">R$ 0</div></div>
+          <div><div class="label">Ainda pendente</div><div class="value down" id="kpiPendenteTotal">R$ 0</div></div>
+        </div>
+      </div>
+
       <div class="section-title"><h2>Produtos mais lucrativos</h2></div>
       <div class="card" style="padding:0;">
         <table><thead><tr><th>Produto</th><th>Vendidos</th><th>Receita</th><th>Margem</th></tr></thead>
@@ -488,6 +500,9 @@ Maleta G | Combos</textarea>
         <table><thead><tr><th>Canal</th><th>Vendas</th><th>Receita</th><th>% do total</th></tr></thead>
         <tbody id="canaisBody"><tr><td colspan="4" class="empty">Sem vendas registradas ainda</td></tr></tbody></table>
       </div>
+
+      <div class="section-title"><h2>💰 Custo x Receita por canal</h2></div>
+      <div class="card"><div class="chart-wrap"><canvas id="chartCanaisCustoReceita"></canvas></div></div>
     </section>
 
     <!-- ============ VENDAS ============ -->
@@ -1289,14 +1304,15 @@ function initUI(db){
   }
 
   /* ---------- CANAIS ---------- */
-  let chartCanaisReceita, chartCanaisQtd, chartCanaisDash;
+  let chartCanaisReceita, chartCanaisQtd, chartCanaisDash, chartCanaisCustoReceita;
   function renderCanais(){
     const porCanal = {};
     state.vendas.forEach(v=>{
       const c = v.canal||"Outro";
-      porCanal[c] = porCanal[c] || {qtd:0, receita:0};
+      porCanal[c] = porCanal[c] || {qtd:0, receita:0, custo:0};
       porCanal[c].qtd += qtdVenda(v);
       porCanal[c].receita += totalVenda(v);
+      porCanal[c].custo += custoProdutosVenda(v) + (v.freteCliente==="nao" ? (v.frete||0) : 0) + taxaCartaoVenda(v);
     });
     const canais = Object.keys(porCanal);
     const totalReceita = canais.reduce((s,c)=>s+porCanal[c].receita,0);
@@ -1318,6 +1334,15 @@ function initUI(db){
     chartCanaisDash = updateChart(chartCanaisDash, "chartCanais", "doughnut", {
       labels: canais, datasets:[{data:canais.map(c=>porCanal[c].receita), backgroundColor: colors}]
     }, {plugins:{title:{display:true,text:"Receita por canal"}}});
+
+    chartCanaisCustoReceita = updateChart(chartCanaisCustoReceita, "chartCanaisCustoReceita", "bar", {
+      labels: canais,
+      datasets:[
+        {label:"Receita", data:canais.map(c=>porCanal[c].receita), backgroundColor:"#B8A4D4"},
+        {label:"Custo", data:canais.map(c=>porCanal[c].custo), backgroundColor:"#E8918A"},
+        {label:"Lucro", data:canais.map(c=>porCanal[c].receita-porCanal[c].custo), backgroundColor:"#8FC9A9"}
+      ]
+    }, {plugins:{title:{display:true,text:"Custo x Receita x Lucro por canal (histórico completo)"}}});
   }
 
   /* ---------- CONFIG ---------- */
@@ -1378,7 +1403,7 @@ function initUI(db){
   }
 
   /* ---------- DASHBOARD (navegação por mês + comparativo + insights) ---------- */
-  let chartMeses, chartEstados, chartProdutosVendidos;
+  let chartMeses, chartEstados, chartProdutosVendidos, chartDespesas, chartPagoPendente;
   let dashOffset = 0; // 0 = mês atual, -1 = mês anterior, etc.
 
   function addMonths(date, n){ const d=new Date(date); d.setMonth(d.getMonth()+n); return d; }
@@ -1571,6 +1596,50 @@ function initUI(db){
       labels: produtosArr.map(p=>p[0]),
       datasets:[{label:"Unidades vendidas", data: produtosArr.map(p=>p[1]), backgroundColor:"#34BCDB"}]
     }, {indexAxis:"y", plugins:{title:{display:true,text:"Produtos mais vendidos (unidades)"},legend:{display:false}}});
+
+    // Despesas por categoria — últimos 6 meses (empilhado)
+    const despesasPorMes = meses.map(m=>{
+      const vs = state.vendas.filter(v=>monthKey(v.data)===m.key);
+      const cs = state.custos.filter(c=> c.recorrente==="sim" || monthKey(c.data)===m.key);
+      const ms = state.materiais.filter(mm=>monthKey(mm.dataCompra)===m.key);
+      return {
+        produtos: vs.reduce((s,v)=>s+custoProdutosVenda(v),0),
+        freteAbs: vs.reduce((s,v)=>s+(v.freteCliente==="nao"?v.frete:0),0) + cs.filter(c=>c.categoria==="Frete").reduce((s,c)=>s+c.valor,0),
+        taxaCartao: vs.reduce((s,v)=>s+taxaCartaoVenda(v),0),
+        suprimentos: ms.reduce((s,mm)=>s+(mm.valor||0)+(mm.frete||0),0),
+        funcionario: cs.filter(c=>c.categoria==="Funcionário").reduce((s,c)=>s+c.valor,0),
+        midia: cs.filter(c=>c.categoria==="Mídia").reduce((s,c)=>s+c.valor,0),
+        material: cs.filter(c=>c.categoria==="Material").reduce((s,c)=>s+c.valor,0),
+        outro: cs.filter(c=>c.categoria==="Outro").reduce((s,c)=>s+c.valor,0)
+      };
+    });
+    chartDespesas = updateChart(chartDespesas, "chartDespesas", "bar", {
+      labels: meses.map(m=>m.label),
+      datasets:[
+        {label:"Produtos vendidos", data: despesasPorMes.map(d=>d.produtos), backgroundColor:"#E8A9BC"},
+        {label:"Frete", data: despesasPorMes.map(d=>d.freteAbs), backgroundColor:"#34BCDB"},
+        {label:"Taxa de cartão", data: despesasPorMes.map(d=>d.taxaCartao), backgroundColor:"#E8918A"},
+        {label:"Suprimentos", data: despesasPorMes.map(d=>d.suprimentos), backgroundColor:"#B8A4D4"},
+        {label:"Funcionário", data: despesasPorMes.map(d=>d.funcionario), backgroundColor:"#E8C070"},
+        {label:"Mídia", data: despesasPorMes.map(d=>d.midia), backgroundColor:"#8FC9A9"},
+        {label:"Material", data: despesasPorMes.map(d=>d.material), backgroundColor:"#8FB8D8"},
+        {label:"Outro", data: despesasPorMes.map(d=>d.outro), backgroundColor:"#D48A9E"}
+      ]
+    }, {scales:{x:{stacked:true},y:{stacked:true}}, plugins:{title:{display:false}}});
+
+    // Recebido x Pendente — todas as vendas (histórico completo)
+    let totalRecebido = 0, totalPendente = 0;
+    state.vendas.forEach(v=>{
+      totalRecebido += totalPagoVenda(v);
+      const falta = valorACobrar(v) - totalPagoVenda(v);
+      if(falta>0.01) totalPendente += falta;
+    });
+    document.getElementById("kpiRecebido").textContent = brl(totalRecebido);
+    document.getElementById("kpiPendenteTotal").textContent = brl(totalPendente);
+    chartPagoPendente = updateChart(chartPagoPendente, "chartPagoPendente", "doughnut", {
+      labels: ["Recebido", "Pendente"],
+      datasets:[{data:[totalRecebido, totalPendente], backgroundColor:["#8FC9A9","#E8918A"]}]
+    }, {plugins:{title:{display:true,text:"Recebido x Pendente"}}});
   }
 
   function updateChart(instance, canvasId, type, data, extraOptions){
