@@ -1571,6 +1571,11 @@ function initUI(db){
       const ticketMedio = receita / vendasMes.length;
       insights.push(`<b>Ticket médio do mês:</b> ${brl(ticketMedio)} por venda.`);
 
+      const freteTotalPedidos = vendasMes.reduce((s,v)=> s + (v.frete||0), 0) + atual.custosMes.filter(c=>c.categoria==="Frete").reduce((s,c)=>s+c.valor,0);
+      if(freteTotalPedidos>0){
+        insights.push(`<b>Frete total dos pedidos:</b> ${brl(freteTotalPedidos)} somando todos os fretes do mês (pagos pelo cliente + absorvidos por você).`);
+      }
+
       const freteAbsorvido = vendasMes.reduce((s,v)=> s + (v.freteCliente==="nao" ? v.frete : 0), 0);
       if(freteAbsorvido>0){
         const pctFrete = receita>0 ? (freteAbsorvido/receita*100) : 0;
