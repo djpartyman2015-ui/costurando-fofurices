@@ -155,7 +155,8 @@ tr:last-child td{border-bottom:none;}
   #printArea, #printArea *{visibility:visible;}
   #printArea{position:absolute;top:0;left:0;width:100%;padding:10px 0;}
   .no-print{display:none !important;}
-  .print-only{display:block !important;}
+  div.print-only{display:block !important;}
+  th.print-only,td.print-only{display:table-cell !important;}
   #printHeaderTop{display:flex !important;}
 }
 </style>
@@ -254,6 +255,11 @@ tr:last-child td{border-bottom:none;}
 
       <div class="section-title"><h2>📊 Insights do mês</h2></div>
       <div class="tip-box" id="insightsBody"></div>
+
+      <div class="section-title"><h2>📋 Detalhamento de custos do mês</h2></div>
+      <div class="card" style="padding:0;">
+        <table><tbody id="detalheCustosBody"></tbody></table>
+      </div>
 
       <div class="section-title">
         <h2>📦 Entregas da semana <span id="semanaCount" style="font-weight:400;color:var(--text-soft);font-size:13px;"></span></h2>
@@ -1378,7 +1384,20 @@ function initUI(db){
     document.getElementById("printBrandName").textContent = state.config.nome || "Ateliê Costurando Fofurices";
     const agora = new Date();
     document.getElementById("printTimestamp").textContent = "Impresso em " + agora.toLocaleDateString("pt-BR") + " às " + agora.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+
+    // Se algum pedido foi marcado, imprime só os marcados. Se nenhum, imprime a lista toda.
+    const checks = [...document.querySelectorAll(".entrega-check")];
+    const algumMarcado = checks.some(c=>c.checked);
+    if(algumMarcado){
+      checks.forEach(c=>{
+        const tr = c.closest("tr");
+        if(tr) tr.style.display = c.checked ? "" : "none";
+      });
+    }
     window.print();
+    if(algumMarcado){
+      setTimeout(()=>{ checks.forEach(c=>{ const tr=c.closest("tr"); if(tr) tr.style.display=""; }); }, 300);
+    }
   };
 
   function renderEntregasSemana(){
@@ -1393,8 +1412,9 @@ function initUI(db){
     const grupos = {};
     relevantes.forEach(v=>{
       const key = (v.cliente||"Cliente não informado")+"|"+v.prazo;
-      if(!grupos[key]) grupos[key] = { cliente:v.cliente||"Cliente não informado", prazo:v.prazo, canal:v.canal, itens:[] };
+      if(!grupos[key]) grupos[key] = { cliente:v.cliente||"Cliente não informado", prazo:v.prazo, canal:v.canal, itens:[], vendaIds:[] };
       itensDaVenda(v).forEach(i=> grupos[key].itens.push(i.produtoNome + (i.qtd>1 ? ` (x${i.qtd})` : "")));
+      grupos[key].vendaIds.push(v.id);
     });
     const lista = Object.values(grupos).sort((a,b)=> a.prazo.localeCompare(b.prazo));
 
@@ -1408,11 +1428,13 @@ function initUI(db){
       body.innerHTML = '<div class="empty">Nenhuma entrega pendente para os próximos 7 dias 🎉</div>';
       return;
     }
-    body.innerHTML = `<table><thead><tr><th style="width:30px;"></th><th>Entrega</th><th>Cliente</th><th>Itens do pedido</th><th>Canal</th></tr></thead><tbody>` +
+    body.innerHTML = `<table><thead><tr><th style="width:30px;" class="no-print"></th><th style="width:24px;" class="print-only"></th><th>Entrega</th><th>Cliente</th><th>Itens do pedido</th><th>Canal</th></tr></thead><tbody>` +
       lista.map(g=>{
         const atrasado = g.prazo < hojeStr;
-        return `<tr>
-          <td><input type="checkbox" class="entrega-check"></td>
+        const primeiroId = g.vendaIds[0];
+        return `<tr onclick="abrirDetalheVenda('${primeiroId}')" style="cursor:pointer;">
+          <td class="no-print" onclick="event.stopPropagation()" title="Marque para imprimir só os pedidos selecionados"><input type="checkbox" class="entrega-check"></td>
+          <td class="print-only"><span style="display:inline-block;width:13px;height:13px;border:1.5px solid #666;"></span></td>
           <td>${fmtData(g.prazo)} ${atrasado ? '<span class="badge red">Atrasado</span>' : ''}</td>
           <td><b>${g.cliente}</b></td>
           <td>${g.itens.join(", ")}</td>
@@ -1446,14 +1468,20 @@ function initUI(db){
     const comprasMes = state.materiais.filter(m=>monthKey(m.dataCompra)===mk);
     const receita = vendasMes.reduce((s,v)=>s+totalVenda(v),0);
     const custoProdutos = vendasMes.reduce((s,v)=>s+custoProdutosVenda(v),0);
-    const custoFreteAbsorvido = vendasMes.reduce((s,v)=> s + (v.freteCliente==="nao" ? v.frete : 0), 0);
-    const custosGerais = custosMes.reduce((s,c)=>s+c.valor,0);
+    const custoFreteVendas = vendasMes.reduce((s,v)=> s + (v.freteCliente==="nao" ? v.frete : 0), 0);
+    const custoFreteCustos = custosMes.filter(c=>c.categoria==="Frete").reduce((s,c)=>s+c.valor,0);
+    const custoFuncionario = custosMes.filter(c=>c.categoria==="Funcionário").reduce((s,c)=>s+c.valor,0);
+    const custoMidia = custosMes.filter(c=>c.categoria==="Mídia").reduce((s,c)=>s+c.valor,0);
+    const custoMaterialManual = custosMes.filter(c=>c.categoria==="Material").reduce((s,c)=>s+c.valor,0);
+    const custoOutro = custosMes.filter(c=>c.categoria==="Outro").reduce((s,c)=>s+c.valor,0);
+    const custosGerais = custosMes.reduce((s,c)=>s+c.valor,0); // já inclui a categoria "Frete" acima
+    const custoFreteTotalExibicao = custoFreteVendas + custoFreteCustos; // só pra exibição, não somar de novo no total
     const custoSuprimentos = comprasMes.reduce((s,m)=>s+(m.valor||0)+(m.frete||0),0);
     const custoTaxaCartao = vendasMes.reduce((s,v)=>s+taxaCartaoVenda(v),0);
-    const custoTotal = custoProdutos + custoFreteAbsorvido + custosGerais + custoSuprimentos + custoTaxaCartao;
+    const custoTotal = custoProdutos + custoFreteVendas + custosGerais + custoSuprimentos + custoTaxaCartao;
     const lucro = receita - custoTotal;
     const margem = receita>0 ? (lucro/receita*100) : 0;
-    return { vendasMes, custosMes, comprasMes, receita, custoProdutos, custoFreteAbsorvido, custosGerais, custoSuprimentos, custoTaxaCartao, custoTotal, lucro, margem };
+    return { vendasMes, custosMes, comprasMes, receita, custoProdutos, custoFreteAbsorvido:custoFreteVendas, custoFreteTotalExibicao, custosGerais, custoSuprimentos, custoTaxaCartao, custoFuncionario, custoMidia, custoMaterialManual, custoOutro, custoTotal, lucro, margem };
   }
 
   function renderDashboard(){
@@ -1564,6 +1592,23 @@ function initUI(db){
     }
 
     document.getElementById("insightsBody").innerHTML = insights.map(t=>`• ${t}`).join("<br><br>");
+
+    // Detalhamento de custos do mês, categoria por categoria
+    const categoriasCusto = [
+      {label:"🧵 Produtos vendidos (material + mão de obra)", valor: atual.custoProdutos},
+      {label:"📦 Frete", valor: atual.custoFreteTotalExibicao},
+      {label:"💳 Taxa de cartão", valor: atual.custoTaxaCartao},
+      {label:"🛒 Suprimentos", valor: atual.custoSuprimentos},
+      {label:"👤 Funcionário", valor: atual.custoFuncionario},
+      {label:"📣 Mídia", valor: atual.custoMidia},
+      {label:"🧶 Material (lançamento manual)", valor: atual.custoMaterialManual},
+      {label:"📋 Outro", valor: atual.custoOutro}
+    ].filter(c=>c.valor>0.004);
+    const detalheCustosBody = document.getElementById("detalheCustosBody");
+    detalheCustosBody.innerHTML = categoriasCusto.length
+      ? categoriasCusto.map(c=>`<tr><td style="padding:10px;">${c.label}</td><td style="padding:10px;text-align:right;font-weight:700;">${brl(c.valor)}</td></tr>`).join("") +
+        `<tr style="border-top:2px solid var(--border);"><td style="padding:10px;font-weight:700;">Total</td><td style="padding:10px;text-align:right;font-weight:700;color:var(--primary-dark);">${brl(atual.custoTotal)}</td></tr>`
+      : `<tr><td class="empty" style="padding:20px;">Nenhum custo lançado neste mês</td></tr>`;
 
     // Gráfico últimos 6 meses (terminando no mês selecionado)
     const meses = [];
