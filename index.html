@@ -628,7 +628,7 @@ Maleta G | Combos</textarea>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, indexedDBLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
   getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
   onSnapshot, query, orderBy, setDoc, getDoc
@@ -677,6 +677,10 @@ async function startApp(){
     const auth = getAuth(app);
     const db = getFirestore(app);
     const provider = new GoogleAuthProvider();
+
+    // Força a sessão a ficar salva no dispositivo até um logout explícito
+    try{ await setPersistence(auth, indexedDBLocalPersistence); }
+    catch(e){ await setPersistence(auth, browserLocalPersistence); }
 
     document.getElementById("setupScreen").style.display = "none";
 
