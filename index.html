@@ -628,7 +628,7 @@ Maleta G | Combos</textarea>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, indexedDBLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, indexedDBLocalPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
   getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
   onSnapshot, query, orderBy, setDoc, getDoc
@@ -684,8 +684,22 @@ async function startApp(){
 
     document.getElementById("setupScreen").style.display = "none";
 
+    // Captura o resultado de um login via redirect (celular/PWA), se houver
+    try{ await getRedirectResult(auth); }
+    catch(err){ document.getElementById("loginError").textContent = "Não foi possível entrar: " + err.message; }
+
+    function usarRedirectLogin(){
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      return isStandalone || isMobile;
+    }
+
     document.getElementById("btnGoogleLogin").addEventListener("click", async ()=>{
       document.getElementById("loginError").textContent = "";
+      if(usarRedirectLogin()){
+        signInWithRedirect(auth, provider);
+        return;
+      }
       try{
         await signInWithPopup(auth, provider);
       } catch(err){
