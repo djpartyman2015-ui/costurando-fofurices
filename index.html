@@ -150,10 +150,11 @@ tr:last-child td{border-bottom:none;}
 .logo-preview{width:64px;height:64px;border-radius:50%;object-fit:cover;background:var(--primary);}
 .entrega-check{width:16px;height:16px;}
 .print-only{display:none;}
+.screen-hidden{display:none;}
 @media print{
   body *{visibility:hidden;}
   .print-target, .print-target *{visibility:visible;}
-  .print-target{position:absolute;top:0;left:0;width:100%;padding:10px 0;}
+  .print-target{position:absolute;top:0;left:0;width:100%;padding:10px 0;display:block !important;}
   .no-print{display:none !important;}
   div.print-only{display:block !important;}
   th.print-only,td.print-only{display:table-cell !important;}
@@ -599,7 +600,7 @@ Maleta G | Combos</textarea>
     </div>
 
     <!-- Área exclusiva de impressão de UM pedido -->
-    <div id="printPedidoArea" style="display:none;">
+    <div id="printPedidoArea" class="screen-hidden">
       <div class="print-header-flex" style="align-items:center;gap:14px;margin-bottom:4px;padding-bottom:12px;border-bottom:2px solid var(--primary);">
         <img id="printPedidoLogo" src="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;">
         <div style="flex:1;">
