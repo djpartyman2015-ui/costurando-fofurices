@@ -152,12 +152,12 @@ tr:last-child td{border-bottom:none;}
 .print-only{display:none;}
 @media print{
   body *{visibility:hidden;}
-  #printArea, #printArea *{visibility:visible;}
-  #printArea{position:absolute;top:0;left:0;width:100%;padding:10px 0;}
+  .print-target, .print-target *{visibility:visible;}
+  .print-target{position:absolute;top:0;left:0;width:100%;padding:10px 0;}
   .no-print{display:none !important;}
   div.print-only{display:block !important;}
   th.print-only,td.print-only{display:table-cell !important;}
-  #printHeaderTop{display:flex !important;}
+  .print-header-flex{display:flex !important;}
 }
 </style>
 </head>
@@ -266,7 +266,7 @@ tr:last-child td{border-bottom:none;}
         <button class="btn secondary small no-print" onclick="imprimirEntregas()">🖨️ Imprimir lista</button>
       </div>
       <div class="card" id="printArea">
-        <div id="printHeaderTop" class="print-only" style="align-items:center;gap:14px;margin-bottom:4px;padding-bottom:12px;border-bottom:2px solid var(--primary);">
+        <div id="printHeaderTop" class="print-only print-header-flex" style="align-items:center;gap:14px;margin-bottom:4px;padding-bottom:12px;border-bottom:2px solid var(--primary);">
           <img id="printLogo" src="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;">
           <div style="flex:1;">
             <div style="font-family:'Fredoka',sans-serif;font-size:22px;font-weight:700;color:var(--primary-dark);">Entregas da Semana</div>
@@ -590,12 +590,25 @@ Maleta G | Combos</textarea>
     <!-- ============ MODAL DETALHE DA VENDA ============ -->
     <div id="vendaDetalheModal" style="display:none;position:fixed;inset:0;background:rgba(74,59,63,.45);z-index:997;align-items:center;justify-content:center;padding:20px;">
       <div class="card" style="max-width:480px;width:100%;max-height:85vh;overflow-y:auto;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;" class="no-print">
           <h2 style="margin:0;font-size:18px;">Detalhes da venda</h2>
           <button class="btn ghost small" onclick="fecharDetalheVenda()">✕ Fechar</button>
         </div>
         <div id="vendaDetalheBody"></div>
       </div>
+    </div>
+
+    <!-- Área exclusiva de impressão de UM pedido -->
+    <div id="printPedidoArea" style="display:none;">
+      <div class="print-header-flex" style="align-items:center;gap:14px;margin-bottom:4px;padding-bottom:12px;border-bottom:2px solid var(--primary);">
+        <img id="printPedidoLogo" src="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;">
+        <div style="flex:1;">
+          <div style="font-family:'Fredoka',sans-serif;font-size:22px;font-weight:700;color:var(--primary-dark);">Detalhes do Pedido</div>
+          <div id="printPedidoBrandName" style="font-size:12px;color:var(--text-soft);"></div>
+        </div>
+        <div id="printPedidoTimestamp" style="font-size:11px;color:var(--text-soft);text-align:right;"></div>
+      </div>
+      <div id="printPedidoBody" style="margin-top:14px;"></div>
     </div>
 
     <!-- ============ CONFIG / ID VISUAL ============ -->
@@ -1282,17 +1295,15 @@ function initUI(db){
   }
 
   window.fecharDetalheVenda = ()=>{ document.getElementById("vendaDetalheModal").style.display = "none"; };
-  window.abrirDetalheVenda = (id)=>{
-    const v = state.vendas.find(x=>x.id===id);
-    if(!v) return;
+  function htmlDetalhePedido(v, paraImpressao){
     const wpp = linkWhatsApp(v.whatsapp);
     const itens = itensDaVenda(v);
     const linhasItens = itens.map(i=>`<tr><td style="color:var(--text-soft);padding:4px 0;">${i.produtoNome}${i.qtd>1?` (x${i.qtd})`:""}</td><td style="text-align:right;">${brl(i.preco*i.qtd)}</td></tr>`).join("");
-    document.getElementById("vendaDetalheBody").innerHTML = `
-      <div style="display:flex;gap:8px;margin-bottom:12px;">${badgeEntrega(v)} ${badgePagamento(v)}</div>
+    return `
+      ${paraImpressao ? "" : `<div style="display:flex;gap:8px;margin-bottom:12px;">${badgeEntrega(v)} ${badgePagamento(v)}</div>`}
       <table style="width:100%;font-size:13.5px;">
         <tr><td style="color:var(--text-soft);padding:6px 0;">Cliente</td><td style="text-align:right;font-weight:700;">${v.cliente||"—"} ${v.estado?`(${v.estado})`:""}</td></tr>
-        <tr><td style="color:var(--text-soft);padding:6px 0;">WhatsApp</td><td style="text-align:right;">${v.whatsapp || "—"} ${wpp?`<a href="${wpp}" target="_blank" class="btn ghost small" style="text-decoration:none;">💬 Conversar</a>`:`<button class="btn ghost small" onclick="editarVenda('${v.id}')">Adicionar número</button>`}</td></tr>
+        <tr><td style="color:var(--text-soft);padding:6px 0;">WhatsApp</td><td style="text-align:right;">${v.whatsapp || "—"} ${!paraImpressao ? (wpp?`<a href="${wpp}" target="_blank" class="btn ghost small" style="text-decoration:none;">💬 Conversar</a>`:`<button class="btn ghost small" onclick="editarVenda('${v.id}')">Adicionar número</button>`) : ""}</td></tr>
         ${v.instagram ? `<tr><td style="color:var(--text-soft);padding:6px 0;">Instagram</td><td style="text-align:right;">📷 ${v.instagram}</td></tr>` : ""}
         ${v.nomeBebe ? `<tr><td style="color:var(--text-soft);padding:6px 0;">Nome do bebê</td><td style="text-align:right;">👶 ${v.nomeBebe}</td></tr>` : ""}
       </table>
@@ -1315,9 +1326,29 @@ function initUI(db){
         <tr><td style="color:var(--text-soft);padding:4px 0;">Via Pix</td><td style="text-align:right;">${brl(v.pagamentoPix||0)}</td></tr>
         <tr><td style="padding:4px 0;font-weight:700;">Total pago</td><td style="text-align:right;font-weight:700;">${brl(totalPagoVenda(v))}</td></tr>
         ${valorACobrar(v)-totalPagoVenda(v) > 0.01 ? `<tr><td style="color:var(--coral);padding:4px 0;">Falta receber</td><td style="text-align:right;color:var(--coral);">${brl(valorACobrar(v)-totalPagoVenda(v))}</td></tr>` : ""}
-      </table>
-      <div style="display:flex;gap:8px;margin-top:16px;">
+      </table>`;
+  }
+
+  window.imprimirPedido = (id)=>{
+    const v = state.vendas.find(x=>x.id===id);
+    if(!v) return;
+    document.getElementById("printPedidoLogo").src = state.config.logo || DEFAULT_LOGO;
+    document.getElementById("printPedidoBrandName").textContent = state.config.nome || "Ateliê Costurando Fofurices";
+    const agora = new Date();
+    document.getElementById("printPedidoTimestamp").textContent = "Impresso em " + agora.toLocaleDateString("pt-BR") + " às " + agora.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+    document.getElementById("printPedidoBody").innerHTML = htmlDetalhePedido(v, true);
+    document.getElementById("printPedidoArea").classList.add("print-target");
+    window.print();
+    document.getElementById("printPedidoArea").classList.remove("print-target");
+  };
+
+  window.abrirDetalheVenda = (id)=>{
+    const v = state.vendas.find(x=>x.id===id);
+    if(!v) return;
+    document.getElementById("vendaDetalheBody").innerHTML = htmlDetalhePedido(v, false) + `
+      <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;" class="no-print">
         <button class="btn small" onclick="editarVenda('${v.id}')">✏️ Editar</button>
+        <button class="btn secondary small" onclick="imprimirPedido('${v.id}')">🖨️ Imprimir pedido</button>
         ${v.status!=="Entregue" ? `<button class="btn secondary small" onclick="marcarEntregue('${v.id}'); fecharDetalheVenda();">Marcar entregue</button>` : ""}
       </div>
     `;
@@ -1419,7 +1450,9 @@ function initUI(db){
         if(tr) tr.style.display = c.checked ? "" : "none";
       });
     }
+    document.getElementById("printArea").classList.add("print-target");
     window.print();
+    document.getElementById("printArea").classList.remove("print-target");
     if(algumMarcado){
       setTimeout(()=>{ checks.forEach(c=>{ const tr=c.closest("tr"); if(tr) tr.style.display=""; }); }, 300);
     }
