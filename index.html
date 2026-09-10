@@ -152,9 +152,8 @@ tr:last-child td{border-bottom:none;}
 .print-only{display:none;}
 .screen-hidden{display:none;}
 @media print{
-  body *{visibility:hidden;}
-  .print-target, .print-target *{visibility:visible;}
-  .print-target{position:absolute;top:0;left:0;width:100%;padding:10px 0;display:block !important;}
+  #setupScreen, #loginScreen, .shell{display:none !important;}
+  .print-target{display:block !important;}
   .no-print{display:none !important;}
   div.print-only{display:block !important;}
   th.print-only,td.print-only{display:table-cell !important;}
@@ -267,15 +266,7 @@ tr:last-child td{border-bottom:none;}
         <button class="btn secondary small no-print" onclick="imprimirEntregas()">🖨️ Imprimir lista</button>
       </div>
       <div class="card" id="printArea">
-        <div id="printHeaderTop" class="print-only print-header-flex" style="align-items:center;gap:14px;margin-bottom:4px;padding-bottom:12px;border-bottom:2px solid var(--primary);">
-          <img id="printLogo" src="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;">
-          <div style="flex:1;">
-            <div style="font-family:'Fredoka',sans-serif;font-size:22px;font-weight:700;color:var(--primary-dark);">Entregas da Semana</div>
-            <div id="printBrandName" style="font-size:12px;color:var(--text-soft);"></div>
-          </div>
-          <div id="printTimestamp" style="font-size:11px;color:var(--text-soft);text-align:right;"></div>
-        </div>
-        <div style="font-size:12px;color:var(--text-soft);margin:10px 0;" id="semanaRange"></div>
+        <div style="font-size:12px;color:var(--text-soft);margin:0 0 10px;" id="semanaRange"></div>
         <div id="entregasSemanaBody"></div>
       </div>
 
@@ -597,19 +588,6 @@ Maleta G | Combos</textarea>
         </div>
         <div id="vendaDetalheBody"></div>
       </div>
-    </div>
-
-    <!-- Área exclusiva de impressão de UM pedido -->
-    <div id="printPedidoArea" class="screen-hidden">
-      <div class="print-header-flex" style="align-items:center;gap:14px;margin-bottom:4px;padding-bottom:12px;border-bottom:2px solid var(--primary);">
-        <img id="printPedidoLogo" src="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;">
-        <div style="flex:1;">
-          <div style="font-family:'Fredoka',sans-serif;font-size:22px;font-weight:700;color:var(--primary-dark);">Detalhes do Pedido</div>
-          <div id="printPedidoBrandName" style="font-size:12px;color:var(--text-soft);"></div>
-        </div>
-        <div id="printPedidoTimestamp" style="font-size:11px;color:var(--text-soft);text-align:right;"></div>
-      </div>
-      <div id="printPedidoBody" style="margin-top:14px;"></div>
     </div>
 
     <!-- ============ CONFIG / ID VISUAL ============ -->
@@ -1330,17 +1308,25 @@ function initUI(db){
       </table>`;
   }
 
+  function prepararCabecalhoImpressao(titulo){
+    document.getElementById("printOutputLogo").src = state.config.logo || DEFAULT_LOGO;
+    document.getElementById("printOutputTitle").textContent = titulo;
+    document.getElementById("printOutputBrandName").textContent = state.config.nome || "Ateliê Costurando Fofurices";
+    const agora = new Date();
+    document.getElementById("printOutputTimestamp").textContent = "Impresso em " + agora.toLocaleDateString("pt-BR") + " às " + agora.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+  }
+  function executarImpressao(){
+    document.getElementById("printOutput").classList.add("print-target");
+    window.print();
+    document.getElementById("printOutput").classList.remove("print-target");
+  }
+
   window.imprimirPedido = (id)=>{
     const v = state.vendas.find(x=>x.id===id);
     if(!v) return;
-    document.getElementById("printPedidoLogo").src = state.config.logo || DEFAULT_LOGO;
-    document.getElementById("printPedidoBrandName").textContent = state.config.nome || "Ateliê Costurando Fofurices";
-    const agora = new Date();
-    document.getElementById("printPedidoTimestamp").textContent = "Impresso em " + agora.toLocaleDateString("pt-BR") + " às " + agora.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
-    document.getElementById("printPedidoBody").innerHTML = htmlDetalhePedido(v, true);
-    document.getElementById("printPedidoArea").classList.add("print-target");
-    window.print();
-    document.getElementById("printPedidoArea").classList.remove("print-target");
+    prepararCabecalhoImpressao("Detalhes do Pedido");
+    document.getElementById("printOutputBody").innerHTML = htmlDetalhePedido(v, true);
+    executarImpressao();
   };
 
   window.abrirDetalheVenda = (id)=>{
@@ -1437,10 +1423,7 @@ function initUI(db){
 
   /* ---------- ENTREGAS DA SEMANA (agrupado por pedido, não por produto) ---------- */
   window.imprimirEntregas = ()=>{
-    document.getElementById("printLogo").src = state.config.logo || DEFAULT_LOGO;
-    document.getElementById("printBrandName").textContent = state.config.nome || "Ateliê Costurando Fofurices";
-    const agora = new Date();
-    document.getElementById("printTimestamp").textContent = "Impresso em " + agora.toLocaleDateString("pt-BR") + " às " + agora.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+    prepararCabecalhoImpressao("Entregas da Semana");
 
     // Se algum pedido foi marcado, imprime só os marcados. Se nenhum, imprime a lista toda.
     const checks = [...document.querySelectorAll(".entrega-check")];
@@ -1451,12 +1434,13 @@ function initUI(db){
         if(tr) tr.style.display = c.checked ? "" : "none";
       });
     }
-    document.getElementById("printArea").classList.add("print-target");
-    window.print();
-    document.getElementById("printArea").classList.remove("print-target");
+    const semanaRangeTexto = document.getElementById("semanaRange").textContent;
+    const entregasHtml = document.getElementById("entregasSemanaBody").innerHTML;
     if(algumMarcado){
-      setTimeout(()=>{ checks.forEach(c=>{ const tr=c.closest("tr"); if(tr) tr.style.display=""; }); }, 300);
+      checks.forEach(c=>{ const tr=c.closest("tr"); if(tr) tr.style.display=""; });
     }
+    document.getElementById("printOutputBody").innerHTML = `<div style="font-size:12px;color:var(--text-soft);margin-bottom:10px;">${semanaRangeTexto}</div>` + entregasHtml;
+    executarImpressao();
   };
 
   function renderEntregasSemana(){
@@ -1779,5 +1763,18 @@ function initUI(db){
   applyConfig();
 }
 </script>
+
+<!-- Container único de impressão — fora do layout principal, evita páginas em branco sobrando -->
+<div id="printOutput" class="screen-hidden">
+  <div class="print-header-flex" style="align-items:center;gap:14px;margin-bottom:4px;padding-bottom:12px;border-bottom:2px solid var(--primary);">
+    <img id="printOutputLogo" src="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;">
+    <div style="flex:1;">
+      <div id="printOutputTitle" style="font-family:'Fredoka',sans-serif;font-size:22px;font-weight:700;color:var(--primary-dark);"></div>
+      <div id="printOutputBrandName" style="font-size:12px;color:var(--text-soft);"></div>
+    </div>
+    <div id="printOutputTimestamp" style="font-size:11px;color:var(--text-soft);text-align:right;"></div>
+  </div>
+  <div id="printOutputBody" style="margin-top:14px;"></div>
+</div>
 </body>
 </html>
